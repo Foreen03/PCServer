@@ -1,0 +1,89 @@
+# Visual Studio
+.vs/
+*.sln.docstates
+*.user
+*.userosscache
+*.suo
+*.opendata
+*.VC.opendata
+*.sdf
+*.jfm
+*.lref
+*.vsp
+*.log
+*.tlog
+*.trx
+*.scc
+*.vspscc
+*.vssscc
+*.buildscc
+*.pidb
+*.booproj
+*.dep
+*.ncb
+*.aps
+*.bsc
+*.euo
+*.res
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+[Bb]uild/
+[Rr]esharperBuild/
+*.dll
+*.exe
+*.pdb
+*.tmp
+*.bak
+*.old
+*.ilk
+*.meta
+*.mdf
+*.ldf
+*.obj
+*.lib
+*.exp
+*.cache
+*.ncb
+*.opensdf
+
+# NuGet
+*.nupkg
+*.snupkg
+*.lock.json
+project.assets.json
+packages/
+.nuget/
+*.nuget.log
+
+# Rider
+.idea/
+
+# Dotnet tool local tool directory
+.config/dotnet-tools.json
+
+# Test Results
+TestResults/
+
+# Azure
+.azure/
+
+# Node.js
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+*.swp
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
