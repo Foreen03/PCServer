@@ -143,7 +143,7 @@ export default function Page() {
           const data = JSON.parse(message);
           switch (data.type) {
             case "log":
-              setLogs((prevLogs) => [...prevLogs, data.message]);
+              setLogs((prevLogs) => [...prevLogs, data.message].slice(-100));
               break;
             case "status":
               if (data.gattStatus !== undefined) {
@@ -163,7 +163,7 @@ export default function Page() {
           setLogs((prevLogs) => [
             ...prevLogs,
             `[ERROR] Failed to parse message: ${message}`,
-          ]);
+          ].slice(-100));
         }
       });
     }
@@ -173,7 +173,7 @@ export default function Page() {
     if (window.external && window.external.sendMessage) {
       window.external.sendMessage(JSON.stringify(payload));
     } else {
-      setLogs((prevLogs) => [...prevLogs, "Photino bridge not found."]);
+      setLogs((prevLogs) => [...prevLogs, "Photino bridge not found."].slice(-100));
     }
   };
 

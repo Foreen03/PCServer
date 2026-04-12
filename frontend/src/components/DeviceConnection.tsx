@@ -9,7 +9,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Bluetooth, ArrowLeft } from "lucide-react";
+import { ArrowLeft, Cast } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 interface DeviceConnectionProps {
   onBackToMenu: () => void;
@@ -36,6 +37,12 @@ export function DeviceConnection({
   onDeactivateMode,
   onSendLayout,
 }: DeviceConnectionProps) {
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col h-screen">
@@ -58,25 +65,26 @@ export function DeviceConnection({
             </Tooltip>
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-md bg-primary/20 flex items-center justify-center">
-                <Bluetooth className="h-4 w-4 text-primary" />
+                <Cast className="h-4 w-4 text-primary" />
               </div>
               <h1 className="text-sm font-semibold text-foreground">
                 PC Receiver
               </h1>
             </div>
+            <div className="h-4 w-px bg-border" />
+            <span className="text-xs text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground text-center">
+                Manage GATT server and BLE device connections
+              </p>
+            </span>
           </div>
         </header>
 
         {/* Main Content Area */}
         <ScrollArea className="flex-1">
           <div className="mx-auto max-w-4xl space-y-6 px-4">
-            {/* Card Description as standalone */}
-            <p className="text-sm text-muted-foreground text-center pt-4">
-              Manage GATT server and BLE device connections
-            </p>
-
             {/* Status Section */}
-            <div className="space-y-3">
+            <div className="space-y-3 pt-4">
               <h4 className="text-sm font-medium text-foreground">Status</h4>
               <div className="p-4 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card">
                 <div className="flex items-center gap-3">
@@ -174,6 +182,7 @@ export function DeviceConnection({
                 <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
                   {logs.length > 0 ? logs.join("\n") : "No logs yet..."}
                 </pre>
+                <div ref={logEndRef} />
               </ScrollArea>
             </div>
             <p className="text-xs text-muted-foreground text-center pt-4">
