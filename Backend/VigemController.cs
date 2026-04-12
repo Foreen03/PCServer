@@ -20,6 +20,7 @@ namespace Backend
         private ControllerMapping? controllerMapping;
         
         private Dictionary<string, bool> sensorToggleStates = new Dictionary<string, bool>();
+        private Dictionary<string, float> smoothedAxisValues = new Dictionary<string, float>();
 
         private static readonly object _processingLock = new object();
 
@@ -159,39 +160,100 @@ namespace Backend
             foreach (var axisEntry in mapping.AxisMap)
             {
                 var axisConfig = axisEntry.Value;
-                if (axisConfig.Source == null) continue;
-
-                if (p.payload.TryGetValue(axisConfig.Source, out var rawValue))
+                if (axisConfig.Mode == "tilt")
                 {
-                    var value = Convert.ToDouble(rawValue);
-
-                    // 1. Apply deadzone
-                    if (Math.Abs(value) < axisConfig.Deadzone)
+                    if (!p.payload.TryGetValue("x", out var rawX) ||
+                        !p.payload.TryGetValue("y", out var rawY) ||
+                        !p.payload.TryGetValue("z", out var rawZ))
                     {
-                        value = 0;
+                        continue;
                     }
 
-                    // 2. Apply scale
-                    value *= axisConfig.Scale;
+                    float ax = Convert.ToSingle(rawX);
+                    float ay = Convert.ToSingle(rawY);
+                    float az = Convert.ToSingle(rawZ);
 
-                    // 3. Apply inversion
+                    float magnitude = MathF.Sqrt(ax * ax + ay * ay + az * az);
+                    if (magnitude < 0.0001f) continue;
+
+                    float rawSteering = 0f;
+                    string steerSource = axisConfig.Source ?? "x";
+                    if (steerSource == "x") rawSteering = ax / magnitude;
+                    else if (steerSource == "y") rawSteering = ay / magnitude;
+                    else if (steerSource == "z") rawSteering = az / magnitude;
+                    
+                    float targetSteering = 0f;
+                    float deadZone = (float)axisConfig.Deadzone;
+                    if (deadZone >= 1.0f)
+                    {
+                        Log($"Warning: Deadzone for {axisEntry.Key} is {deadZone}, which is >= 1.0. This will result in no input. Clamping to 0.999f for calculation.");
+                        deadZone = 0.999f;
+                    }
+                    
+                    float absSteering = Math.Abs(rawSteering);
+                    if (absSteering > deadZone)
+                    {
+                        targetSteering = (absSteering - deadZone) / (1.0f - deadZone);
+                        targetSteering *= Math.Sign(rawSteering);
+                    }
+                    
+                    float maxTilt = (float)axisConfig.Scale;
+                    if (maxTilt <= 0)
+                    {
+                        Log($"Warning: Scale (MaxTilt) for {axisEntry.Key} is {maxTilt}. A non-positive value is invalid. Defaulting to 1.0.");
+                        maxTilt = 1.0f;
+                    }
+                    targetSteering = Math.Clamp(targetSteering / maxTilt, -1f, 1f);
+                    
+                    if (!smoothedAxisValues.ContainsKey(axisEntry.Key))
+                    {
+                        smoothedAxisValues[axisEntry.Key] = 0f;
+                    }
+                    
+                    smoothedAxisValues[axisEntry.Key] = Lerp(smoothedAxisValues[axisEntry.Key], targetSteering, (float)axisConfig.Smoothing);
+
                     if (axisConfig.Invert)
                     {
-                        value = -value;
+                        smoothedAxisValues[axisEntry.Key] *= -1;
                     }
 
-                    // 4. Clamp value
-                    if (axisConfig.Clamp != null && axisConfig.Clamp.Count == 2)
-                    {
-                        value = Math.Max(axisConfig.Clamp[0], Math.Min(axisConfig.Clamp[1], value));
-                    }
-
-                    // 5. Convert to short for controller axis
-                    short axisValue = (short)(value * 32767.0);
-
+                    short axisValue = (short)(smoothedAxisValues[axisEntry.Key] * 32767.0f);
                     SetControllerValue(controller, axisConfig.Target, axisValue);
                 }
+                else
+                {
+                    // Original logic for non-tilt axes
+                    if (axisConfig.Source != null && p.payload.TryGetValue(axisConfig.Source, out var rawValue))
+                    {
+                        var value = Convert.ToDouble(rawValue);
+
+                        if (Math.Abs(value) < axisConfig.Deadzone)
+                        {
+                            value = 0;
+                        }
+
+                        value *= axisConfig.Scale;
+
+                        if (axisConfig.Invert)
+                        {
+                            value = -value;
+                        }
+
+                        if (axisConfig.Clamp != null && axisConfig.Clamp.Count == 2)
+                        {
+                            value = Math.Max(axisConfig.Clamp[0], Math.Min(axisConfig.Clamp[1], value));
+                        }
+
+                        short axisValue = (short)(value * 32767.0);
+                        SetControllerValue(controller, axisConfig.Target, axisValue);
+                    }
+                }
             }
+        }
+        
+        private static float Lerp(float a, float b, float t)
+        {
+            return a + (b - a) * t;
         }
         
         private Dictionary<string, double> lastSensorValues = new Dictionary<string, double>();

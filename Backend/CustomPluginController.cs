@@ -21,9 +21,10 @@ namespace Backend
 
         private Dictionary<string, bool> buttonState = new();
         private float ax, ay, az;
+        private float stepsCadence;
         private int steps;
         private long lastTimestamp;
-        
+
         public void SetWindow(Photino.NET.PhotinoWindow window)
         {
             _window = window;
@@ -64,6 +65,7 @@ namespace Backend
                             ax = Convert.ToSingle(p.payload["x"]);
                             ay = Convert.ToSingle(p.payload["y"]);
                             az = Convert.ToSingle(p.payload["z"]);
+                            stepsCadence = Convert.ToSingle(p.payload["stepsCadence"]);
                             lastTimestamp = ts;
 
                             if (p.payload.ContainsKey("buttons"))
@@ -74,7 +76,7 @@ namespace Backend
                                 if (buttonsObj is JObject jObj)
                                 {
                                     buttons = jObj.ToObject<Dictionary<string, bool>>() ?? new Dictionary<string, bool>();
-                                 }
+                                }
                                 else if (buttonsObj is Dictionary<string, bool> dict)
                                 {
                                     buttons = dict;
@@ -103,6 +105,7 @@ namespace Backend
                             y = ay,
                             z = az,
                             steps = steps,
+                            stepsCadence = stepsCadence,
                             buttons = buttonState,
                             timestamp = ts
                         });
@@ -110,7 +113,7 @@ namespace Backend
 
 
                     case "command":
-                        if(p.payload.TryGetValue("command", out var command) && command != null)
+                        if (p.payload.TryGetValue("command", out var command) && command != null)
                         {
                             WebSocketHost.Broadcast(new
                             {
@@ -127,7 +130,7 @@ namespace Backend
                 Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Error processing data: {ex.Message}");
             }
         }
-        
+
         public async void SendLayout()
         {
             var filePath = GetJsonFromFile();
@@ -177,11 +180,11 @@ namespace Backend
                 Log($"Error reading/sending layout: {ex.Message}");
             }
         }
-        
+
         private string GetJsonFromFile()
         {
             var filePath = string.Empty;
-            
+
             Thread thread = new Thread(() =>
             {
                 using (OpenFileDialog openFileDialog = new OpenFileDialog())

@@ -258,7 +258,7 @@ namespace Backend
 
         public Task StopServer()
         {
-            if (serviceProvider != null)
+            if (serviceProvider != null && serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
             {
                 serviceProvider.StopAdvertising();
                 Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] GATT Server stopped.");

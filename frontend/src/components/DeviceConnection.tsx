@@ -1,17 +1,15 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bluetooth, ChevronLeft } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Bluetooth, ArrowLeft } from "lucide-react";
 
 interface DeviceConnectionProps {
   onBackToMenu: () => void;
@@ -39,35 +37,48 @@ export function DeviceConnection({
   onSendLayout,
 }: DeviceConnectionProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-      <div className="w-full max-w-2xl">
-        <Button
-          onClick={onBackToMenu}
-          variant="ghost"
-          className="mb-4 text-muted-foreground"
-        >
-          <ChevronLeft className="w-4 h-4 mr-2" />
-          Back to Menu
-        </Button>
-        <Card className="w-full">
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <Bluetooth className="w-6 h-6 text-primary" />
+    <TooltipProvider delayDuration={200}>
+      <div className="flex flex-col h-screen">
+        {/* Top Toolbar */}
+        <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+          <div className="flex items-center gap-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onBackToMenu}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span className="sr-only">Back to menu</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Back to menu</TooltipContent>
+            </Tooltip>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-md bg-primary/20 flex items-center justify-center">
+                <Bluetooth className="h-4 w-4 text-primary" />
               </div>
-              <div>
-                <CardTitle>PC Receiver</CardTitle>
-                <CardDescription>
-                  Manage GATT server and BLE device connections
-                </CardDescription>
-              </div>
+              <h1 className="text-sm font-semibold text-foreground">
+                PC Receiver
+              </h1>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <ScrollArea className="flex-1">
+          <div className="mx-auto max-w-4xl space-y-6 px-4">
+            {/* Card Description as standalone */}
+            <p className="text-sm text-muted-foreground text-center pt-4">
+              Manage GATT server and BLE device connections
+            </p>
+
             {/* Status Section */}
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Status</h4>
-              <div className="p-4 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="p-4 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card">
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-muted-foreground">
                     GATT Server:
@@ -106,7 +117,7 @@ export function DeviceConnection({
             {/* Actions Section */}
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Actions</h4>
-              <div className="p-4 border rounded-lg space-y-4">
+              <div className="p-4 border rounded-lg space-y-4 bg-card">
                 <div className="flex flex-wrap gap-2">
                   {gattStatus === "stopped" ? (
                     <Button onClick={onStartServer}>Start GATT Server</Button>
@@ -165,14 +176,12 @@ export function DeviceConnection({
                 </pre>
               </ScrollArea>
             </div>
-          </CardContent>
-          <CardFooter>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground text-center pt-4">
               Ensure your mobile device is discoverable and in range.
             </p>
-          </CardFooter>
-        </Card>
+          </div>
+        </ScrollArea>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
