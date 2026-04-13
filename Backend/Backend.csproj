@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
-	<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,17 +15,42 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
   </ItemGroup>
-  
+
   <ItemGroup>
-	<Compile Include="ControllerMapping.cs" />
-	<Compile Include="CustomPluginController.cs" />
-	<Compile Include="GattManager.cs" />
-	<Compile Include="IController.cs" />
-	<Compile Include="Packet.cs" />
-	<Compile Include="PCPacket.cs" />
-	<Compile Include="Program.cs" />
-	<Compile Include="VigemController.cs" />
-	<Compile Include="WebSocketHost.cs" />
+    <Compile Include="ControllerMapping.cs" />
+    <Compile Include="CustomPluginController.cs" />
+    <Compile Include="GattManager.cs" />
+    <Compile Include="IController.cs" />
+    <Compile Include="Packet.cs" />
+    <Compile Include="PCPacket.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="VigemController.cs" />
+    <Compile Include="WebSocketHost.cs" />
   </ItemGroup>
+
+  <Target Name="BuildFrontend" BeforeTargets="PrepareForPublish">
+    <Exec Command="node --version" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeJsExitCode" />
+    </Exec>
+    <Error Condition="'$(NodeJsExitCode)' != '0'" Text="Node.js is required to build the frontend." />
+    <Message Importance="high" Text="Building frontend..." />
+    <Exec Command="npm install --legacy-peer-deps" WorkingDirectory="..\frontend" />
+    <Exec Command="npm run build" WorkingDirectory="..\frontend" />
+    <Message Importance="high" Text="Copying frontend files to wwwroot..." />
+    <ItemGroup>
+      <FrontendBuildOutput Include="..\frontend\dist\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendBuildOutput)" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)" />
+  </Target>
+
+  <Target Name="CopyWwwrootToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <WwwrootFiles Include="$(MSBuildProjectDirectory)\wwwroot\**\*" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(WwwrootFiles)"
+      DestinationFiles="@(WwwrootFiles->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Message Importance="high" Text="Copied wwwroot to $(PublishDir)wwwroot" />
+  </Target>
 
 </Project>

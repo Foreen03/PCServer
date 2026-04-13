@@ -26,7 +26,7 @@ namespace Backend
             _gattManager.SetWindow(_window);
             _customPluginController.SetWindow(_window);
             _vigemController.SetWindow(_window);
-            
+
             _gattManager.OnDataReceived += (sender, data) =>
             {
                 _activeController?.ProcessData(data);
@@ -46,7 +46,7 @@ namespace Backend
                         await _gattManager.StartServerAsync();
                         photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "status", gattStatus = "started" }));
                         break;
-                    
+
                     case "stopServer":
                         await _gattManager.StopServer();
                         _activeController?.Deactivate();
@@ -57,7 +57,7 @@ namespace Backend
                     case "activateMode":
                         var mode = json["mode"]?.ToString();
                         _activeController?.Deactivate();
-                        
+
                         if (mode == "vigem")
                         {
                             _activeController = _vigemController;
@@ -82,8 +82,13 @@ namespace Backend
                 }
             });
 
-            // For development, load the Vite dev server. 
+#if DEBUG
             _window.Load("http://localhost:5173");
+#else
+            string exeDir = AppContext.BaseDirectory;
+            string startFile = Path.Combine(exeDir, "wwwroot", "index.html");
+            _window.Load(startFile);
+#endif
 
             _window.WaitForClose();
         }
