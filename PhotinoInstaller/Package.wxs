@@ -13,9 +13,16 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <Icon Id="AppIcon.ico" SourceFile="connection.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" />
+
     <Feature Id="MainFeature" Title="PhotinoApp" Level="1">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
@@ -25,6 +32,7 @@
       <Directory Id="ProgramMenuFolder">
         <Directory Id="ApplicationProgramsFolder" Name="PhotinoApp" />
       </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
     </Directory>
 
     <DirectoryRef Id="ApplicationProgramsFolder">
@@ -33,11 +41,24 @@
           Name="PhotinoApp"
           Description="PhotinoApp"
           Target="[INSTALLFOLDER]Backend.exe"
-          WorkingDirectory="INSTALLFOLDER" />
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon.ico" />
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\MMU\PhotinoApp" Name="installed" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
+    <DirectoryRef Id="DesktopFolder">
+    <Component Id="DesktopShortcut" Guid="A1B2C3D4-1234-5678-ABCD-1234567890CD">
+      <Shortcut Id="DesktopShortcutLink"
+        Name="PhotinoApp"
+        Description="PhotinoApp"
+        Target="[INSTALLFOLDER]Backend.exe"
+        WorkingDirectory="INSTALLFOLDER"
+        Icon="AppIcon.ico" />
+      <RemoveFolder Id="DesktopFolderRemove" Directory="DesktopFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\MMU\PhotinoApp" Name="desktopshortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </DirectoryRef>
 
   </Product>
 </Wix>
