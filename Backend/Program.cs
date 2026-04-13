@@ -18,7 +18,7 @@ namespace Backend
         static void Main(string[] args)
         {
             _window = new PhotinoWindow()
-                .SetTitle("GATT Server UI")
+                .SetTitle("BlueStep Connect PC Receiver")
                 .SetUseOsDefaultSize(false)
                 .SetSize(1024, 768)
                 .Center();
