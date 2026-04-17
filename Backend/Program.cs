@@ -32,6 +32,22 @@ namespace Backend
                 _activeController?.ProcessData(data);
             };
 
+            _gattManager.OnControllerConnectionChanged += (connected) =>
+            {
+                if (_activeController != _customPluginController) return;
+
+                if (connected)
+                {
+                    WebSocketHost.Start();
+                    WebSocketHost.Broadcast(new { type = "command", value = "controller_connected" });
+                }
+                else
+                {
+                    WebSocketHost.Broadcast(new { type = "command", value = "controller_disconnected" });
+                    WebSocketHost.Stop();
+                }
+            };
+
             _window.RegisterWebMessageReceivedHandler(async (object? sender, string message) =>
             {
                 var photinoWindow = sender as PhotinoWindow;

@@ -26,12 +26,12 @@ namespace Backend
         private string currentValue = "Hello BLE";
         private int connectedDeviceCount = 0;
         private readonly SemaphoreSlim _notifyLock = new SemaphoreSlim(1, 1);
-        
+
         public event EventHandler<string>? OnDataReceived;
 
         private System.Threading.Timer? heartbeatTimer;
         private const int heartbeatDelay = 1000;
-
+        public event Action<bool>? OnControllerConnectionChanged;
 
         public async Task NotifyValueChanged(string value)
         {
@@ -157,7 +157,7 @@ namespace Backend
                 };
 
                 serviceProvider.StartAdvertising(advParams);
-                
+
                 Log("GATT Server started and advertising...");
                 Log("Please connect a BLE client from your device.");
             }
@@ -240,6 +240,7 @@ namespace Backend
                         await SendHeartbeat();
                     }, null, 0, heartbeatDelay);
                 }
+                WebSocketHost.Broadcast(new { type = "command", value = "controller_connected" });
             }
             else if (currentCount < connectedDeviceCount)
             {
@@ -250,6 +251,7 @@ namespace Backend
                     heartbeatTimer.Dispose();
                     heartbeatTimer = null;
                 }
+                WebSocketHost.Broadcast(new { type = "command", value = "controller_disconnected" });
             }
 
             connectedDeviceCount = currentCount;
