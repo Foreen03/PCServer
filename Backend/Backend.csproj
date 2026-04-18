@@ -28,22 +28,29 @@
     <Compile Include="WebSocketHost.cs" />
   </ItemGroup>
 
-  <Target Name="BuildFrontend" BeforeTargets="PrepareForPublish">
+  <Target Name="BuildFrontend">
     <Exec Command="node --version" ContinueOnError="true">
       <Output TaskParameter="ExitCode" PropertyName="NodeJsExitCode" />
     </Exec>
     <Error Condition="'$(NodeJsExitCode)' != '0'" Text="Node.js is required to build the frontend." />
+
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\wwwroot" />
+
     <Message Importance="high" Text="Building frontend..." />
     <Exec Command="npm install --legacy-peer-deps" WorkingDirectory="..\frontend" />
     <Exec Command="npm run build" WorkingDirectory="..\frontend" />
     <Message Importance="high" Text="Copying frontend files to wwwroot..." />
-    <ItemGroup>
-      <FrontendBuildOutput Include="..\frontend\dist\**" />
-    </ItemGroup>
-    <Copy SourceFiles="@(FrontendBuildOutput)" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)" />
+
+    <CreateItem Include="..\frontend\dist\**\*.*">
+      <Output TaskParameter="Include" ItemName="FrontendBuildOutput" />
+    </CreateItem>
+
+    <Copy
+      SourceFiles="@(FrontendBuildOutput)"
+      DestinationFiles="@(FrontendBuildOutput->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
-  <Target Name="CopyWwwrootToPublish" AfterTargets="Publish">
+  <Target Name="CopyWwwrootToPublish" BeforeTargets="Publish" DependsOnTargets="BuildFrontend">
     <ItemGroup>
       <WwwrootFiles Include="$(MSBuildProjectDirectory)\wwwroot\**\*" />
     </ItemGroup>

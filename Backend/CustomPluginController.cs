@@ -181,6 +181,47 @@ namespace Backend
             }
         }
 
+        public async void SendLayoutWithoutWindow(string layout)
+        {
+            if (string.IsNullOrEmpty(layout))
+            {
+                Log("Layout data is empty.");
+                return;
+            }
+
+            try
+            {
+                JObject obj = JObject.Parse(layout);
+
+                var layoutPacket = new PCPacket
+                {
+                    type = "GAMEPAD_LAYOUT",
+                    timeStamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    data = obj.ToString()
+                };
+
+                string layoutJsonToSend = JsonConvert.SerializeObject(layoutPacket);
+
+                var headerPacket = new
+                {
+                    type = "TRANSFER_START",
+                    totalLength = layoutJsonToSend.Length
+                };
+
+                Log($"Sending Layout... Size: {layoutJsonToSend.Length} bytes");
+
+                await _gattManager.NotifyValueChanged(JsonConvert.SerializeObject(headerPacket));
+                await System.Threading.Tasks.Task.Delay(100);
+                await _gattManager.NotifyValueChanged(layoutJsonToSend);
+
+                Log("Layout sent successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error sending layout: {ex.Message}");
+            }
+        }
+        
         private string GetJsonFromFile()
         {
             var filePath = string.Empty;

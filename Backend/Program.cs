@@ -95,6 +95,14 @@ namespace Backend
                     case "sendLayout":
                         _customPluginController.SendLayout();
                         break;
+                    
+                    case "sendLayoutWithoutWindow":
+                        var layout = json["layout"]?.ToString();
+                        if (!string.IsNullOrEmpty(layout))
+                        {
+                            _customPluginController.SendLayoutWithoutWindow(layout);
+                        }
+                        break;
                 }
             });
 

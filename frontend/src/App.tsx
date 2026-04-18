@@ -1,11 +1,12 @@
 "use client";
 
-import { useReducer, useState, useCallback, useEffect } from "react";
+import { useReducer, useState, useCallback, useEffect, useRef } from "react";
 import type { GamepadLayout, EditorAction } from "@/lib/types";
 import { createEmptyLayout } from "@/lib/default-layout";
 import { GamepadEditor } from "@/components/GamepadEditor";
 import { MainMenu } from "@/components/MainMenu";
 import { DeviceConnection } from "@/components/DeviceConnection";
+import { toast } from "sonner";
 
 function editorReducer(
   state: GamepadLayout,
@@ -111,6 +112,10 @@ export default function Page() {
   const [activeMode, setActiveMode] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
+  const promiseRef = useRef<{
+    resolve: () => void;
+    reject: (error: string) => void;
+  } | null>(null);
 
   const handleSelect = useCallback((id: string | null) => {
     setSelectedId(id);
@@ -144,6 +149,16 @@ export default function Page() {
           switch (data.type) {
             case "log":
               setLogs((prevLogs) => [...prevLogs, data.message].slice(-100));
+              if (data.message.includes("Layout sent successfully.")) {
+                promiseRef.current?.resolve();
+                promiseRef.current = null;
+              } else if (data.message.includes("Error sending layout:")) {
+                const errorMsg = data.message
+                  .replace("Error sending layout:", "")
+                  .trim();
+                promiseRef.current?.reject(errorMsg);
+                promiseRef.current = null;
+              }
               break;
             case "status":
               if (data.gattStatus !== undefined) {
@@ -160,10 +175,11 @@ export default function Page() {
               break;
           }
         } catch (error) {
-          setLogs((prevLogs) => [
-            ...prevLogs,
-            `[ERROR] Failed to parse message: ${message}`,
-          ].slice(-100));
+          setLogs((prevLogs) =>
+            [...prevLogs, `[ERROR] Failed to parse message: ${message}`].slice(
+              -100,
+            ),
+          );
         }
       });
     }
@@ -173,7 +189,9 @@ export default function Page() {
     if (window.external && window.external.sendMessage) {
       window.external.sendMessage(JSON.stringify(payload));
     } else {
-      setLogs((prevLogs) => [...prevLogs, "Photino bridge not found."].slice(-100));
+      setLogs((prevLogs) =>
+        [...prevLogs, "Photino bridge not found."].slice(-100),
+      );
     }
   };
 
@@ -182,7 +200,20 @@ export default function Page() {
   const handleActivateMode = (mode: "vigem" | "custom") =>
     sendMessage({ action: "activateMode", mode });
   const handleDeactivateMode = () => sendMessage({ action: "deactivateMode" });
-  const handleSendLayout = () => sendMessage({action: "sendLayout"});
+  const handleSendLayout = () => {
+    const promise = new Promise<void>((resolve, reject) => {
+      promiseRef.current = { resolve, reject };
+    });
+
+    toast.promise(promise, {
+      loading: "Sending layout",
+      success: "Layout sent successfully",
+      error: (err) => `Error sending layout: ${err}`,
+      position: "top-center",
+    });
+
+    sendMessage({ action: "sendLayout" });
+  };
 
   if (view === "menu") {
     return (
@@ -218,6 +249,7 @@ export default function Page() {
       onSelect={handleSelect}
       dispatch={dispatch}
       onBackToMenu={handleBackToMenu}
+      connected={connected}
     />
   );
 }
