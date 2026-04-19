@@ -54,6 +54,26 @@ export interface Layout {
   components: GamepadComponent[]
 }
 
+export interface ConflictResolution {
+  name: string;
+  mode: "priority";
+  commands: string[];
+  priority: string[];
+}
+
+export function isConflictResolution(obj: unknown): obj is ConflictResolution {
+  if (typeof obj !== "object" || obj === null) return false;
+  const cr = obj as ConflictResolution;
+  return (
+    typeof cr.name === "string" &&
+    cr.mode === "priority" &&
+    Array.isArray(cr.commands) &&
+    cr.commands.every((c) => typeof c === "string") &&
+    Array.isArray(cr.priority) &&
+    cr.priority.every((p) => typeof p === "string")
+  );
+}
+
 export interface Gamepad {
   id: string
   name: string
@@ -66,6 +86,48 @@ export interface GamepadLayout {
   gamepad: Gamepad
   theme: Theme
   layout: Layout
+  conflictsResolution?: ConflictResolution[]
+  controllerMapping?: ControllerMapping
+}
+
+export interface ButtonMap {
+  [command: string]: string;
+}
+
+export interface AxisConfig {
+  target: string;
+  mode: "tilt";
+  source: "x" | "y" | "z";
+  deadzone: number;
+  scale: number;
+  smoothing: number;
+  invert: boolean;
+}
+
+export interface AxisMap {
+  [command: string]: AxisConfig;
+}
+
+export interface SensorThresholds {
+  start?: number;
+  stop?: number;
+}
+
+export interface SensorConfig {
+  target: string;
+  mode: "toggle";
+  thresholds: SensorThresholds;
+}
+
+export interface SensorMap {
+  [command: string]: SensorConfig;
+}
+
+export interface ControllerMapping {
+  enabled: boolean;
+  buttonMap: ButtonMap;
+  axisMap: AxisMap;
+  sensorMap: SensorMap;
 }
 
 // Type guards and validators
@@ -180,12 +242,90 @@ export function isGamepad(obj: unknown): obj is Gamepad {
 export function isGamepadLayout(obj: unknown): obj is GamepadLayout {
   if (typeof obj !== "object" || obj === null) return false
   const gl = obj as GamepadLayout
-  return (
+  const baseValidation =
     typeof gl.version === "number" &&
     isGamepad(gl.gamepad) &&
     isTheme(gl.theme) &&
     isLayout(gl.layout)
-  )
+
+  if (!baseValidation) return false
+
+  // Optional conflictsResolution
+  if (gl.conflictsResolution !== undefined) {
+    if (!Array.isArray(gl.conflictsResolution)) return false
+    if (!gl.conflictsResolution.every(isConflictResolution)) return false
+  }
+
+  if (gl.controllerMapping !== undefined) {
+    if (!isControllerMapping(gl.controllerMapping)) return false
+  }
+
+  return true
+}
+
+export function isControllerMapping(obj: unknown): obj is ControllerMapping {
+    if (typeof obj !== "object" || obj === null) return false;
+    const cm = obj as ControllerMapping;
+    return (
+        typeof cm.enabled === "boolean" &&
+        isButtonMap(cm.buttonMap) &&
+        isAxisMap(cm.axisMap) &&
+        isSensorMap(cm.sensorMap)
+    );
+}
+
+export function isButtonMap(obj: unknown): obj is ButtonMap {
+    if (typeof obj !== "object" || obj === null) return false;
+    for (const key in obj) {
+        if (typeof (obj as ButtonMap)[key] !== 'string') return false;
+    }
+    return true;
+}
+
+export function isAxisMap(obj: unknown): obj is AxisMap {
+    if (typeof obj !== "object" || obj === null) return false;
+    for (const key in obj) {
+        if (!isAxisConfig((obj as AxisMap)[key])) return false;
+    }
+    return true;
+}
+
+export function isAxisConfig(obj: unknown): obj is AxisConfig {
+    if (typeof obj !== "object" || obj === null) return false;
+    const ac = obj as AxisConfig;
+    return (
+        typeof ac.target === "string" &&
+        ac.mode === "tilt" &&
+        (ac.source === "x" || ac.source === "y" || ac.source === "z") &&
+        typeof ac.deadzone === "number" &&
+        typeof ac.scale === "number" &&
+        typeof ac.smoothing === "number" &&
+        typeof ac.invert === "boolean"
+    );
+}
+
+export function isSensorMap(obj: unknown): obj is SensorMap {
+    if (typeof obj !== "object" || obj === null) return false;
+    for (const key in obj) {
+        if (!isSensorConfig((obj as SensorMap)[key])) return false;
+    }
+    return true;
+}
+
+export function isSensorConfig(obj: unknown): obj is SensorConfig {
+    if (typeof obj !== "object" || obj === null) return false;
+    const sc = obj as SensorConfig;
+    return (
+        typeof sc.target === "string" &&
+        sc.mode === "toggle" &&
+        isSensorThresholds(sc.thresholds)
+    );
+}
+
+export function isSensorThresholds(obj: unknown): obj is SensorThresholds {
+    if (typeof obj !== "object" || obj === null) return false;
+    const st = obj as SensorThresholds;
+    return typeof st.start === "number" && typeof st.stop === "number";
 }
 
 export interface ValidationResult {
@@ -242,6 +382,23 @@ export function validateGamepadLayout(data: unknown): ValidationResult {
     }
   }
 
+  if (obj.conflictsResolution !== undefined) {
+    if (!Array.isArray(obj.conflictsResolution)) {
+        return { valid: false, error: "Invalid 'conflictsResolution': expected an array" };
+    }
+    for (let i = 0; i < obj.conflictsResolution.length; i++) {
+        if (!isConflictResolution(obj.conflictsResolution[i])) {
+            return { valid: false, error: `Invalid item at index ${i} in 'conflictsResolution'` };
+        }
+    }
+  }
+
+  if (obj.controllerMapping !== undefined) {
+    if (!isControllerMapping(obj.controllerMapping)) {
+        return { valid: false, error: "Invalid 'controllerMapping' object." };
+    }
+  }
+
   return { valid: true }
 }
 
@@ -257,3 +414,9 @@ export type EditorAction =
   | { type: "ADD_COMPONENT"; payload: GamepadComponent }
   | { type: "UPDATE_COMPONENT"; payload: { id: string; updates: Partial<GamepadComponent> } }
   | { type: "DELETE_COMPONENT"; payload: string }
+  | { type: "ADD_CONFLICT_RESOLUTION"; payload: ConflictResolution }
+  | { type: "UPDATE_CONFLICT_RESOLUTION"; payload: { index: number; updates: Partial<ConflictResolution> } }
+  | { type: "DELETE_CONFLICT_RESOLUTION"; payload: number }
+  | { type: "SET_CONFLICT_RESOLUTIONS"; payload: ConflictResolution[] }
+  | { type: "SET_CONTROLLER_MAPPING"; payload: ControllerMapping }
+  | { type: "UPDATE_CONTROLLER_MAPPING"; payload: Partial<ControllerMapping> }

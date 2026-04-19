@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useCallback, useState } from "react"
+import { useCallback, useState } from "react";
 import {
   ChevronRight,
   Trash2,
@@ -9,33 +9,129 @@ import {
   Square,
   Gamepad2,
   Palette,
-  Shield,
+  Handshake,
   Layers,
   Settings2,
-} from "lucide-react"
-import type { GamepadLayout, GamepadComponent, EditorAction } from "@/lib/types"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
+  GripVertical,
+  Gamepad,
+  ShieldCheck
+} from "lucide-react";
+import type {
+  GamepadLayout,
+  GamepadComponent,
+  EditorAction,
+  ControllerMapping,
+  AxisConfig,
+  SensorConfig,
+} from "@/lib/types";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+const XBOX_BUTTONS = [
+  "A",
+  "B",
+  "X",
+  "Y",
+  "LeftShoulder",
+  "RightShoulder",
+  "LeftTrigger",
+  "RightTrigger",
+  "LeftStick",
+  "RightStick",
+  "Start",
+  "Back",
+  "Up",
+  "Down",
+  "Left",
+  "Right",
+];
+const XBOX_AXES = ["LeftStickX", "LeftStickY", "RightStickX", "RightStickY"];
+
+interface SortableCommandProps {
+  id: string; // This is the command
+  onRemove: (id: string) => void;
+  buttonLabel: string; // The label to display
+}
+
+export function SortableCommand({
+  id,
+  onRemove,
+  buttonLabel,
+}: SortableCommandProps) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className="flex items-center justify-between p-2 bg-secondary/50 rounded-md"
+    >
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 cursor-grab"
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </Button>
+        <Badge variant="outline">{buttonLabel}</Badge>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+        onClick={() => onRemove(id)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 interface PropertiesPanelProps {
-  state: GamepadLayout
-  selectedId: string | null
-  onSelect: (id: string | null) => void
-  dispatch: React.Dispatch<EditorAction>
+  state: GamepadLayout;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  dispatch: React.Dispatch<EditorAction>;
 }
 
 function Section({
@@ -44,12 +140,12 @@ function Section({
   defaultOpen = true,
   children,
 }: {
-  icon: React.ElementType
-  title: string
-  defaultOpen?: boolean
-  children: React.ReactNode
+  icon: React.ElementType;
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div>
@@ -65,36 +161,36 @@ function Section({
         <ChevronRight
           className={cn(
             "h-4 w-4 text-muted-foreground transition-transform duration-200",
-            open && "rotate-90"
+            open && "rotate-90",
           )}
         />
       </button>
       {open && <div>{children}</div>}
     </div>
-  )
+  );
 }
 
 function FieldRow({
   label,
   children,
 }: {
-  label: string
-  children: React.ReactNode
+  label: string;
+  children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
-  )
+  );
 }
 
 function ColorInput({
   value,
   onChange,
 }: {
-  value: string
-  onChange: (v: string) => void
+  value: string;
+  onChange: (v: string) => void;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -116,7 +212,7 @@ function ColorInput({
         className="h-8 font-mono text-xs"
       />
     </div>
-  )
+  );
 }
 
 export function PropertiesPanel({
@@ -127,10 +223,92 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const selectedComponent = selectedId
     ? state.layout.components.find((c) => c.id === selectedId)
-    : null
+    : null;
+
+  const commandToLabelMap = new Map<string, string>();
+  state.layout.components.forEach((c) => {
+    commandToLabelMap.set(c.command, c.label);
+  });
+
+  const availableCommandOptions = state.layout.components.reduce(
+    (acc, comp) => {
+      if (!acc.some((option) => option.command === comp.command)) {
+        acc.push({ command: comp.command, label: comp.label });
+      }
+      return acc;
+    },
+    [] as { command: string; label: string }[],
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const activeRuleIndex = state.conflictsResolution?.findIndex((rule) =>
+        rule.priority.includes(active.id as string),
+      );
+      if (activeRuleIndex === undefined || activeRuleIndex === -1) return;
+
+      const oldIndex = state.conflictsResolution![
+        activeRuleIndex
+      ].priority.indexOf(active.id as string);
+      const newIndex = state.conflictsResolution![
+        activeRuleIndex
+      ].priority.indexOf(over!.id as string);
+
+      const newPriority = arrayMove(
+        state.conflictsResolution![activeRuleIndex].priority,
+        oldIndex,
+        newIndex,
+      );
+
+      dispatch({
+        type: "UPDATE_CONFLICT_RESOLUTION",
+        payload: {
+          index: activeRuleIndex,
+          updates: { priority: newPriority },
+        },
+      });
+    }
+  };
+
+  const handleAddCommandToRule = (ruleIndex: number, command: string) => {
+    const rule = state.conflictsResolution?.[ruleIndex];
+    if (rule && !rule.commands.includes(command)) {
+      const updates = {
+        commands: [...rule.commands, command],
+        priority: [...rule.priority, command],
+      };
+      dispatch({
+        type: "UPDATE_CONFLICT_RESOLUTION",
+        payload: { index: ruleIndex, updates },
+      });
+    }
+  };
+
+  const handleRemoveCommandFromRule = (ruleIndex: number, command: string) => {
+    const rule = state.conflictsResolution?.[ruleIndex];
+    if (rule) {
+      const updates = {
+        commands: rule.commands.filter((c) => c !== command),
+        priority: rule.priority.filter((p) => p !== command),
+      };
+      dispatch({
+        type: "UPDATE_CONFLICT_RESOLUTION",
+        payload: { index: ruleIndex, updates },
+      });
+    }
+  };
 
   const handleAddComponent = useCallback(() => {
-    const newId = `btn_${Date.now()}`
+    const newId = `btn_${Date.now()}`;
     const newComponent: GamepadComponent = {
       type: "button",
       id: newId,
@@ -139,24 +317,67 @@ export function PropertiesPanel({
       shape: "circle",
       label: "New",
       command: "new_command",
-    }
-    dispatch({ type: "ADD_COMPONENT", payload: newComponent })
-    onSelect(newId)
-  }, [dispatch, onSelect])
+    };
+    dispatch({ type: "ADD_COMPONENT", payload: newComponent });
+    onSelect(newId);
+  }, [dispatch, onSelect]);
 
   const handleDeleteComponent = useCallback(
     (id: string) => {
-      dispatch({ type: "DELETE_COMPONENT", payload: id })
-      if (selectedId === id) onSelect(null)
+      dispatch({ type: "DELETE_COMPONENT", payload: id });
+      if (selectedId === id) onSelect(null);
     },
-    [dispatch, selectedId, onSelect]
-  )
+    [dispatch, selectedId, onSelect],
+  );
+
+  const handleMappingUpdate = (mapping: Partial<ControllerMapping>) => {
+    dispatch({ type: "UPDATE_CONTROLLER_MAPPING", payload: mapping });
+  };
+
+  const handleAxisMapUpdate = (
+    command: string,
+    config: Partial<AxisConfig>,
+  ) => {
+    const existingConfig = state.controllerMapping?.axisMap?.[command];
+    if (existingConfig) {
+      const updatedConfig = { ...existingConfig, ...config };
+      const newAxisMap = {
+        ...(state.controllerMapping?.axisMap || {}),
+        [command]: updatedConfig,
+      };
+      handleMappingUpdate({ axisMap: newAxisMap });
+    }
+  };
+
+  const handleSensorMapUpdate = (
+    command: string,
+    config: Partial<SensorConfig>,
+  ) => {
+    const existingConfig = state.controllerMapping?.sensorMap?.[command];
+    if (existingConfig) {
+      const updatedConfig = { ...existingConfig, ...config };
+      if ("thresholds" in config) {
+        const existingThresholds =
+          state.controllerMapping?.sensorMap?.[command]?.thresholds;
+        updatedConfig.thresholds = {
+          ...(existingThresholds || { start: 0, stop: 0 }),
+          ...config.thresholds,
+        };
+      }
+      const newSensorMap = {
+        ...(state.controllerMapping?.sensorMap || {}),
+        [command]: updatedConfig,
+      };
+      handleMappingUpdate({ sensorMap: newSensorMap });
+    }
+  };
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-card">
-      {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="text-sm font-semibold text-foreground">Properties</span>
+        <span className="text-sm font-semibold text-foreground">
+          Properties
+        </span>
         <Badge variant="outline" className="text-xs">
           {"v" + state.version}
         </Badge>
@@ -164,7 +385,6 @@ export function PropertiesPanel({
 
       <ScrollArea className="flex-1">
         <div className="pb-6">
-          {/* Gamepad Info */}
           <Section icon={Gamepad2} title="Gamepad Info">
             <div className="flex flex-col gap-3 px-4 pb-4">
               <FieldRow label="Name">
@@ -219,10 +439,7 @@ export function PropertiesPanel({
               </FieldRow>
             </div>
           </Section>
-
           <Separator />
-
-          {/* Theme */}
           <Section icon={Palette} title="Theme">
             <div className="flex flex-col gap-3 px-4 pb-4">
               <FieldRow label="Background Color">
@@ -351,11 +568,8 @@ export function PropertiesPanel({
               </FieldRow>
             </div>
           </Section>
-
           <Separator />
-
-          {/* Safe Area */}
-          <Section icon={Shield} title="Safe Area">
+          <Section icon={ShieldCheck} title="Safe Area">
             <div className="flex flex-col gap-3 px-4 pb-4">
               {(["top", "bottom", "left", "right"] as const).map((side) => (
                 <FieldRow
@@ -378,10 +592,7 @@ export function PropertiesPanel({
               ))}
             </div>
           </Section>
-
           <Separator />
-
-          {/* Components List */}
           <Section icon={Layers} title="Components">
             <div className="flex flex-col gap-1 px-4 pb-3">
               {state.layout.components.map((comp) => (
@@ -391,7 +602,7 @@ export function PropertiesPanel({
                     "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors",
                     selectedId === comp.id
                       ? "bg-primary/15 border border-primary/30"
-                      : "hover:bg-secondary/50 border border-transparent"
+                      : "hover:bg-secondary/50 border border-transparent",
                   )}
                   onClick={() => onSelect(comp.id)}
                 >
@@ -413,12 +624,11 @@ export function PropertiesPanel({
                     size="icon"
                     className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteComponent(comp.id)
+                      e.stopPropagation();
+                      handleDeleteComponent(comp.id);
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    <span className="sr-only">Delete {comp.label}</span>
                   </Button>
                 </div>
               ))}
@@ -433,10 +643,468 @@ export function PropertiesPanel({
               </Button>
             </div>
           </Section>
-
           <Separator />
+          <Section icon={Handshake} title="Conflict Resolution">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex flex-col gap-3 px-4 pb-4">
+                {(state.conflictsResolution || []).map((conflict, index) => (
+                  <div
+                    key={index}
+                    className="flex flex-col gap-2 p-2 border rounded-md"
+                  >
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-medium">
+                        Rule: {conflict.name}
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() =>
+                          dispatch({
+                            type: "DELETE_CONFLICT_RESOLUTION",
+                            payload: index,
+                          })
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <FieldRow label="Name">
+                      <Input
+                        value={conflict.name}
+                        onChange={(e) =>
+                          dispatch({
+                            type: "UPDATE_CONFLICT_RESOLUTION",
+                            payload: {
+                              index,
+                              updates: { name: e.target.value },
+                            },
+                          })
+                        }
+                        className="h-8 text-xs"
+                      />
+                    </FieldRow>
+                    <FieldRow label="Mode">
+                      <Select
+                        value={conflict.mode}
+                        onValueChange={(value) =>
+                          dispatch({
+                            type: "UPDATE_CONFLICT_RESOLUTION",
+                            payload: {
+                              index,
+                              updates: { mode: value as "priority" },
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="priority">Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FieldRow>
+                    <FieldRow label="Add Command">
+                      <Select
+                        onValueChange={(command) =>
+                          handleAddCommandToRule(index, command)
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Add a command..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableCommandOptions
+                            .filter(
+                              (option) =>
+                                !conflict.commands.includes(option.command),
+                            )
+                            .map((option) => (
+                              <SelectItem
+                                key={option.command}
+                                value={option.command}
+                              >
+                                {option.label} ({option.command})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </FieldRow>
+                    <FieldRow label="Priority (drag to reorder)">
+                      <SortableContext
+                        items={conflict.priority}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="flex flex-col gap-2">
+                          {conflict.priority.map((cmd) => (
+                            <SortableCommand
+                              key={cmd}
+                              id={cmd}
+                              onRemove={() =>
+                                handleRemoveCommandFromRule(index, cmd)
+                              }
+                              buttonLabel={commandToLabelMap.get(cmd) || cmd}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </FieldRow>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full text-xs"
+                  onClick={() =>
+                    dispatch({
+                      type: "ADD_CONFLICT_RESOLUTION",
+                      payload: {
+                        name: "New Rule",
+                        mode: "priority",
+                        commands: [],
+                        priority: [],
+                      },
+                    })
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Rule
+                </Button>
+              </div>
+            </DndContext>
+          </Section>
+          <Separator />
+          <Section icon={Gamepad} title="Controller Mapping">
+            <div className="flex flex-col gap-3 px-4 pb-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">
+                  Enable Mapping
+                </Label>
+                <Switch
+                  checked={!!state.controllerMapping?.enabled}
+                  onCheckedChange={(v) => {
+                    if (v && !state.controllerMapping) {
+                      handleMappingUpdate({
+                        enabled: true,
+                        buttonMap: {},
+                        axisMap: {},
+                        sensorMap: {},
+                      });
+                    } else {
+                      handleMappingUpdate({ enabled: v });
+                    }
+                  }}
+                />
+              </div>
+              {state.controllerMapping?.enabled && (
+                <>
+                  <Separator className="my-1" />
+                  <Label className="text-xs text-foreground font-medium">
+                    Button Map
+                  </Label>
+                  {state.layout.components.map((c) => (
+                    <FieldRow key={c.id} label={c.label}>
+                      <Select
+                        value={
+                          state.controllerMapping?.buttonMap?.[c.command] ||
+                          "NONE"
+                        }
+                        onValueChange={(v) => {
+                          const newButtonMap = {
+                            ...(state.controllerMapping?.buttonMap || {}),
+                          };
+                          if (v === "NONE") {
+                            delete newButtonMap[c.command];
+                          } else {
+                            newButtonMap[c.command] = v;
+                          }
+                          handleMappingUpdate({ buttonMap: newButtonMap });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Not Mapped" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">Not Mapped</SelectItem>
+                          {XBOX_BUTTONS.map((btn) => (
+                            <SelectItem key={btn} value={btn}>
+                              {btn}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FieldRow>
+                  ))}
 
-          {/* Selected Component Properties */}
+                  <Separator className="my-1" />
+                  <Label className="text-xs text-foreground font-medium">
+                    Axis: Tilt-to-Steer
+                  </Label>
+                  <div className="p-2 border rounded-md">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">
+                        Enable Tilt Steering
+                      </Label>
+                      <Switch
+                        checked={!!state.controllerMapping?.axisMap?.steer}
+                        onCheckedChange={(v) => {
+                          const newAxisMap = {
+                            ...(state.controllerMapping?.axisMap || {}),
+                          };
+                          if (v) {
+                            newAxisMap.steer = {
+                              target: "LeftStickX",
+                              mode: "tilt",
+                              source: "x",
+                              deadzone: 0.1,
+                              scale: 1,
+                              smoothing: 0,
+                              invert: false,
+                            };
+                          } else {
+                            delete newAxisMap.steer;
+                          }
+                          handleMappingUpdate({ axisMap: newAxisMap });
+                        }}
+                      />
+                    </div>
+                    {state.controllerMapping?.axisMap?.steer && (
+                      <div className="mt-2 flex flex-col gap-3">
+                        <FieldRow label="Mode">
+                          <Select
+                            value={state.controllerMapping.axisMap.steer.mode}
+                            onValueChange={(v) =>
+                              handleAxisMapUpdate("steer", {
+                                mode: v as "tilt",
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="tilt">Tilt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                        <FieldRow label="Target">
+                          <Select
+                            value={state.controllerMapping.axisMap.steer.target}
+                            onValueChange={(v) =>
+                              handleAxisMapUpdate("steer", { target: v })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {XBOX_AXES.map((ax) => (
+                                <SelectItem key={ax} value={ax}>
+                                  {ax}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                        <FieldRow label="Source">
+                          <Select
+                            value={state.controllerMapping.axisMap.steer.source}
+                            onValueChange={(v) =>
+                              handleAxisMapUpdate("steer", {
+                                source: v as "x" | "y" | "z",
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="x">x</SelectItem>
+                              <SelectItem value="y">y</SelectItem>
+                              <SelectItem value="z">z</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                        <FieldRow label="Deadzone">
+                          <Input
+                            type="number"
+                            value={
+                              state.controllerMapping.axisMap.steer.deadzone
+                            }
+                            onChange={(e) =>
+                              handleAxisMapUpdate("steer", {
+                                deadzone: +e.target.value,
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </FieldRow>
+                        <FieldRow label="Scale">
+                          <Input
+                            type="number"
+                            value={state.controllerMapping.axisMap.steer.scale}
+                            onChange={(e) =>
+                              handleAxisMapUpdate("steer", {
+                                scale: +e.target.value,
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </FieldRow>
+                        <FieldRow label="Smoothing">
+                          <Input
+                            type="number"
+                            value={
+                              state.controllerMapping.axisMap.steer.smoothing
+                            }
+                            onChange={(e) =>
+                              handleAxisMapUpdate("steer", {
+                                smoothing: +e.target.value,
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </FieldRow>
+                        <FieldRow label="Invert">
+                          <Switch
+                            checked={
+                              state.controllerMapping.axisMap.steer.invert
+                            }
+                            onCheckedChange={(v) =>
+                              handleAxisMapUpdate("steer", { invert: v })
+                            }
+                          />
+                        </FieldRow>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator className="my-1" />
+                  <Label className="text-xs text-foreground font-medium">
+                    Steps Mapping
+                  </Label>
+                  <div className="p-2 border rounded-md">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Enable</Label>
+                      <Switch
+                        checked={
+                          !!state.controllerMapping?.sensorMap?.stepsCadence
+                        }
+                        onCheckedChange={(v) => {
+                          const newSensorMap = {
+                            ...(state.controllerMapping?.sensorMap || {}),
+                          };
+                          if (v) {
+                            newSensorMap.stepsCadence = {
+                              target: "RightTrigger",
+                              mode: "toggle",
+                              thresholds: { start: 40, stop: 20 },
+                            };
+                          } else {
+                            delete newSensorMap.stepsCadence;
+                          }
+                          handleMappingUpdate({ sensorMap: newSensorMap });
+                        }}
+                      />
+                    </div>
+                    {state.controllerMapping?.sensorMap?.stepsCadence && (
+                      <div className="mt-2 flex flex-col gap-3">
+                        <FieldRow label="Mode">
+                          <Select
+                            value={
+                              state.controllerMapping.sensorMap.stepsCadence
+                                .mode
+                            }
+                            onValueChange={(v) =>
+                              handleSensorMapUpdate("stepsCadence", {
+                                mode: v as "toggle",
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="toggle">Toggle</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                        <FieldRow label="Target">
+                          <Select
+                            value={
+                              state.controllerMapping.sensorMap.stepsCadence
+                                .target
+                            }
+                            onValueChange={(v) =>
+                              handleSensorMapUpdate("stepsCadence", {
+                                target: v,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {XBOX_BUTTONS.map((ax) => (
+                                <SelectItem key={ax} value={ax}>
+                                  {ax}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                        <FieldRow label="Start Threshold">
+                          <Input
+                            type="number"
+                            value={
+                              state.controllerMapping.sensorMap.stepsCadence
+                                .thresholds.start
+                            }
+                            onChange={(e) =>
+                              handleSensorMapUpdate("stepsCadence", {
+                                thresholds: {
+                                  ...state.controllerMapping?.sensorMap
+                                    ?.stepsCadence?.thresholds,
+                                  start: +e.target.value,
+                                },
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </FieldRow>
+                        <FieldRow label="Stop Threshold">
+                          <Input
+                            type="number"
+                            value={
+                              state.controllerMapping.sensorMap.stepsCadence
+                                .thresholds.stop
+                            }
+                            onChange={(e) =>
+                              handleSensorMapUpdate("stepsCadence", {
+                                thresholds: {
+                                  ...state.controllerMapping?.sensorMap
+                                    ?.stepsCadence?.thresholds,
+                                  stop: +e.target.value,
+                                },
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </FieldRow>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </Section>
+          <Separator />
           {selectedComponent && (
             <Section
               icon={Settings2}
@@ -446,15 +1114,7 @@ export function PropertiesPanel({
                 <FieldRow label="ID">
                   <Input
                     value={selectedComponent.id}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "UPDATE_COMPONENT",
-                        payload: {
-                          id: selectedComponent.id,
-                          updates: { id: e.target.value },
-                        },
-                      })
-                    }
+                    readOnly
                     className="h-8 text-xs font-mono"
                   />
                 </FieldRow>
@@ -496,9 +1156,7 @@ export function PropertiesPanel({
                         type: "UPDATE_COMPONENT",
                         payload: {
                           id: selectedComponent.id,
-                          updates: {
-                            shape: v as "circle" | "rectangle",
-                          },
+                          updates: { shape: v as "circle" | "rectangle" },
                         },
                       })
                     }
@@ -512,215 +1170,11 @@ export function PropertiesPanel({
                     </SelectContent>
                   </Select>
                 </FieldRow>
-
-                <Separator className="my-1" />
-
-                <Label className="text-xs text-foreground font-medium">
-                  Position
-                </Label>
-                <FieldRow label="X">
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.position.x]}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                x: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.position.x.toFixed(3)}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                x: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
-                  </div>
-                </FieldRow>
-                <FieldRow label="Y">
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.position.y]}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                y: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.position.y.toFixed(3)}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                y: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
-                  </div>
-                </FieldRow>
-
-                <Separator className="my-1" />
-
-                <Label className="text-xs text-foreground font-medium">
-                  Size
-                </Label>
-                <FieldRow label="Width">
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.size.width]}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                width: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.size.width.toFixed(3)}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                width: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
-                  </div>
-                </FieldRow>
-                <FieldRow label="Height">
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.size.height]}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                height: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.size.height.toFixed(3)}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                height: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
-                  </div>
-                </FieldRow>
               </div>
             </Section>
           )}
         </div>
       </ScrollArea>
     </div>
-  )
+  );
 }

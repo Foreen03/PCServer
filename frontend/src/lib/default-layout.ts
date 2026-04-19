@@ -33,6 +33,9 @@ export const emptyLayout: GamepadLayout = {
     },
     components: [],
   },
+  conflictsResolution: [
+    
+  ],
 }
 
 // Create a fresh empty layout with a new ID
@@ -99,4 +102,12 @@ export const defaultLayout: GamepadLayout = {
       },
     ],
   },
+  conflictsResolution: [],
+  controllerMapping: {
+    enabled: false,
+    buttonMap: {},
+    axisMap: {},
+    sensorMap: {},
+  }
 }
+
