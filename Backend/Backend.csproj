@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +27,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="VigemController.cs" />
     <Compile Include="WebSocketHost.cs" />
+    <None Include="app.manifest" />
   </ItemGroup>
 
   <Target Name="BuildFrontend">

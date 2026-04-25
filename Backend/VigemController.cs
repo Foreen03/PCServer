@@ -10,6 +10,9 @@ using System.Collections.Generic;
 using System.Threading;
 using Photino.NET;
 
+using System.Drawing;
+using System.Drawing.Imaging;
+
 namespace Backend
 {
     public class VigemController : IController
@@ -18,7 +21,7 @@ namespace Backend
         private ViGEmClient? vigemClient;
         private IXbox360Controller? controller;
         private ControllerMapping? controllerMapping;
-        
+
         private Dictionary<string, bool> sensorToggleStates = new Dictionary<string, bool>();
         private Dictionary<string, float> smoothedAxisValues = new Dictionary<string, float>();
 
@@ -97,6 +100,10 @@ namespace Backend
                             {
                                 ProcessSensors(p, controllerMapping.Mapping, controller);
                             }
+                            else if (p.packetType == "command")
+                            {
+                                ProcessCommand(p, controller);
+                            }
 
                             controller.SubmitReport();
                         }
@@ -117,7 +124,74 @@ namespace Backend
             }
         }
 
+        private void ProcessCommand(Packet p, IXbox360Controller controller)
+        {
+            if (p.payload.TryGetValue("command", out var commandObj))
+            {
+                var commandStr = commandObj?.ToString()?.ToLower();
+                if (commandStr == "screenshot")
+                {
+                    CaptureScreen();
+                }
+                else if (commandStr == "pause")
+                {
+                    controller.SetButtonState(Xbox360Button.Start, true);
+                    Thread.Sleep(50); // Simulate a brief button press
+                    controller.SetButtonState(Xbox360Button.Start, false);
+                    Log("Game Paused");
+                }
+            }
+        }
 
+
+        private void CaptureScreen()
+        {
+            if (Screen.PrimaryScreen == null)
+            {
+                Log("Primary Screen is null");
+                return;
+            }
+
+            try
+            {
+                Rectangle bounds = Screen.PrimaryScreen.Bounds;
+                using (Bitmap bitmap = new Bitmap(bounds.Width, bounds.Height))
+                {
+                    using (Graphics g = Graphics.FromImage(bitmap))
+                    {
+                        g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
+                    }
+
+                    string screenshotsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "screenshots");
+                    try
+                    {
+                        Directory.CreateDirectory(screenshotsPath);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        screenshotsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "screenshots");
+                        Directory.CreateDirectory(screenshotsPath);
+                        Log($"Base directory not writable; falling back to {screenshotsPath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        screenshotsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "screenshots");
+                        Directory.CreateDirectory(screenshotsPath);
+                        Log($"Could not create screenshot directory in base dir: {ex.Message}. Falling back to {screenshotsPath}");
+                    }
+
+                    string fileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmssfff}.jpg";
+                    string filePath = Path.Combine(screenshotsPath, fileName);
+
+                    bitmap.Save(filePath, ImageFormat.Jpeg);
+                    Log($"Screen captured to {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error capturing screen: {ex.Message}");
+            }
+        }
 
         private void ProcessButtons(Packet p, MappingConfig mapping, IXbox360Controller controller)
         {
@@ -131,7 +205,7 @@ namespace Backend
                 if (mapping.ButtonMap.TryGetValue(buttonEntry.Key, out var targetButtonStr))
                 {
                     if (targetButtonStr == null) continue;
-                    
+
                     switch (targetButtonStr.ToLower())
                     {
                         case "a": controller.SetButtonState(Xbox360Button.A, buttonEntry.Value); break;
@@ -181,7 +255,7 @@ namespace Backend
                     if (steerSource == "x") rawSteering = ax / magnitude;
                     else if (steerSource == "y") rawSteering = ay / magnitude;
                     else if (steerSource == "z") rawSteering = az / magnitude;
-                    
+
                     float targetSteering = 0f;
                     float deadZone = (float)axisConfig.Deadzone;
                     if (deadZone >= 1.0f)
@@ -189,14 +263,14 @@ namespace Backend
                         Log($"Warning: Deadzone for {axisEntry.Key} is {deadZone}, which is >= 1.0. This will result in no input. Clamping to 0.999f for calculation.");
                         deadZone = 0.999f;
                     }
-                    
+
                     float absSteering = Math.Abs(rawSteering);
                     if (absSteering > deadZone)
                     {
                         targetSteering = (absSteering - deadZone) / (1.0f - deadZone);
                         targetSteering *= Math.Sign(rawSteering);
                     }
-                    
+
                     float maxTilt = (float)axisConfig.Scale;
                     if (maxTilt <= 0)
                     {
@@ -204,12 +278,12 @@ namespace Backend
                         maxTilt = 1.0f;
                     }
                     targetSteering = Math.Clamp(targetSteering / maxTilt, -1f, 1f);
-                    
+
                     if (!smoothedAxisValues.ContainsKey(axisEntry.Key))
                     {
                         smoothedAxisValues[axisEntry.Key] = 0f;
                     }
-                    
+
                     smoothedAxisValues[axisEntry.Key] = Lerp(smoothedAxisValues[axisEntry.Key], targetSteering, (float)axisConfig.Smoothing);
 
                     if (axisConfig.Invert)
@@ -250,12 +324,12 @@ namespace Backend
                 }
             }
         }
-        
+
         private static float Lerp(float a, float b, float t)
         {
             return a + (b - a) * t;
         }
-        
+
         private Dictionary<string, double> lastSensorValues = new Dictionary<string, double>();
 
         private void ProcessSensors(Packet p, MappingConfig mapping, IXbox360Controller controller)
@@ -340,7 +414,7 @@ namespace Backend
         private void SetControllerValue(IXbox360Controller controller, string? target, object value)
         {
             if (target == null) return;
-            
+
             switch (target)
             {
                 // Axes (short)
@@ -370,7 +444,7 @@ namespace Backend
         private string GetJsonFromFile()
         {
             var filePath = string.Empty;
-            
+
             Thread thread = new Thread(() =>
             {
                 using (OpenFileDialog openFileDialog = new OpenFileDialog())
@@ -399,6 +473,6 @@ namespace Backend
             return File.ReadAllText(filePath);
         }
 
-        
+
     }
 }

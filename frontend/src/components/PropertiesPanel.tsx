@@ -14,7 +14,7 @@ import {
   Settings2,
   GripVertical,
   Gamepad,
-  ShieldCheck
+  ShieldCheck,
 } from "lucide-react";
 import type {
   GamepadLayout,
@@ -57,6 +57,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { InfoTooltip } from "./InfoTooltip";
 
 const XBOX_BUTTONS = [
   "A",
@@ -172,14 +173,19 @@ function Section({
 
 function FieldRow({
   label,
+  tooltip,
   children,
 }: {
   label: string;
+  tooltip?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div className="flex items-center gap-1 justify-between">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        {tooltip && <InfoTooltip content={tooltip} />}
+      </div>
       {children}
     </div>
   );
@@ -535,7 +541,9 @@ export function PropertiesPanel({
                   }
                 />
               </FieldRow>
-              <FieldRow label={`Pressed Alpha (${state.theme.button.pressedAlpha.toFixed(2)})`}>
+              <FieldRow
+                label={`Pressed Alpha (${state.theme.button.pressedAlpha.toFixed(2)})`}
+              >
                 <Slider
                   value={[state.theme.button.pressedAlpha]}
                   min={0}
@@ -931,7 +939,10 @@ export function PropertiesPanel({
                             </SelectContent>
                           </Select>
                         </FieldRow>
-                        <FieldRow label="Deadzone">
+                        <FieldRow
+                          label="Deadzone"
+                          tooltip="Tilt angle below this is ignored, preventing drift when the phone is resting still"
+                        >
                           <Input
                             type="number"
                             value={
@@ -945,7 +956,10 @@ export function PropertiesPanel({
                             className="h-8 text-xs"
                           />
                         </FieldRow>
-                        <FieldRow label="Scale">
+                        <FieldRow
+                          label="Scale"
+                          tooltip="Value to tilt to reach full deflection. Lower the value higher the sensitivity of tilting"
+                        >
                           <Input
                             type="number"
                             value={state.controllerMapping.axisMap.steer.scale}
@@ -957,7 +971,10 @@ export function PropertiesPanel({
                             className="h-8 text-xs"
                           />
                         </FieldRow>
-                        <FieldRow label="Smoothing">
+                        <FieldRow
+                          label="Smoothing"
+                          tooltip="Blends between frames to reduce jitter, higher value will become smoother but slightly more lag"
+                        >
                           <Input
                             type="number"
                             value={
@@ -1059,7 +1076,10 @@ export function PropertiesPanel({
                             </SelectContent>
                           </Select>
                         </FieldRow>
-                        <FieldRow label="Start Threshold">
+                        <FieldRow
+                          label="Start Threshold"
+                          tooltip="Steps cadence (steps per minute) to start trigger the button"
+                        >
                           <Input
                             type="number"
                             value={
@@ -1078,7 +1098,10 @@ export function PropertiesPanel({
                             className="h-8 text-xs"
                           />
                         </FieldRow>
-                        <FieldRow label="Stop Threshold">
+                        <FieldRow
+                          label="Stop Threshold"
+                          tooltip="Steps cadence (steps per minute) to stop trigger the button"
+                        >
                           <Input
                             type="number"
                             value={
