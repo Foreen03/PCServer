@@ -1179,7 +1179,9 @@ export function PropertiesPanel({
                         type: "UPDATE_COMPONENT",
                         payload: {
                           id: selectedComponent.id,
-                          updates: { shape: v as "circle" | "rectangle" },
+                          updates: {
+                            shape: v as "circle" | "rectangle",
+                          },
                         },
                       })
                     }
@@ -1192,6 +1194,210 @@ export function PropertiesPanel({
                       <SelectItem value="rectangle">Rectangle</SelectItem>
                     </SelectContent>
                   </Select>
+                </FieldRow>
+
+                <Separator className="my-1" />
+
+                <Label className="text-xs text-foreground font-medium">
+                  Position
+                </Label>
+                <FieldRow label="X">
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[selectedComponent.position.x]}
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      className="flex-1"
+                      onValueChange={([v]) =>
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              position: {
+                                ...selectedComponent.position,
+                                x: v,
+                              },
+                            },
+                          },
+                        })
+                      }
+                    />
+                    <Input
+                      type="number"
+                      value={selectedComponent.position.x.toFixed(3)}
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => {
+                        const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              position: {
+                                ...selectedComponent.position,
+                                x: v,
+                              },
+                            },
+                          },
+                        })
+                      }}
+                    />
+                  </div>
+                </FieldRow>
+                <FieldRow label="Y">
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[selectedComponent.position.y]}
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      className="flex-1"
+                      onValueChange={([v]) =>
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              position: {
+                                ...selectedComponent.position,
+                                y: v,
+                              },
+                            },
+                          },
+                        })
+                      }
+                    />
+                    <Input
+                      type="number"
+                      value={selectedComponent.position.y.toFixed(3)}
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => {
+                        const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              position: {
+                                ...selectedComponent.position,
+                                y: v,
+                              },
+                            },
+                          },
+                        })
+                      }}
+                    />
+                  </div>
+                </FieldRow>
+
+                <Separator className="my-1" />
+
+                <Label className="text-xs text-foreground font-medium">
+                  Size
+                </Label>
+                <FieldRow label="Width">
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[selectedComponent.size.width]}
+                      min={0.02}
+                      max={1}
+                      step={0.001}
+                      className="flex-1"
+                      onValueChange={([v]) =>
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              size: {
+                                ...selectedComponent.size,
+                                width: v,
+                              },
+                            },
+                          },
+                        })
+                      }
+                    />
+                    <Input
+                      type="number"
+                      value={selectedComponent.size.width.toFixed(3)}
+                      min={0.02}
+                      max={1}
+                      step={0.001}
+                      className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => {
+                        const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02))
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              size: {
+                                ...selectedComponent.size,
+                                width: v,
+                              },
+                            },
+                          },
+                        })
+                      }}
+                    />
+                  </div>
+                </FieldRow>
+                <FieldRow label="Height">
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[selectedComponent.size.height]}
+                      min={0.02}
+                      max={1}
+                      step={0.001}
+                      className="flex-1"
+                      onValueChange={([v]) =>
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              size: {
+                                ...selectedComponent.size,
+                                height: v,
+                              },
+                            },
+                          },
+                        })
+                      }
+                    />
+                    <Input
+                      type="number"
+                      value={selectedComponent.size.height.toFixed(3)}
+                      min={0.02}
+                      max={1}
+                      step={0.001}
+                      className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => {
+                        const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02))
+                        dispatch({
+                          type: "UPDATE_COMPONENT",
+                          payload: {
+                            id: selectedComponent.id,
+                            updates: {
+                              size: {
+                                ...selectedComponent.size,
+                                height: v,
+                              },
+                            },
+                          },
+                        })
+                      }}
+                    />
+                  </div>
                 </FieldRow>
               </div>
             </Section>
