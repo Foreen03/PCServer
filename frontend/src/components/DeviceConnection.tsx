@@ -23,6 +23,7 @@ interface DeviceConnectionProps {
   onActivateMode: (mode: "vigem" | "custom") => void;
   onDeactivateMode: () => void;
   onSendLayout: () => void;
+  onExportGpx: () => void;
 }
 
 export function DeviceConnection({
@@ -36,6 +37,7 @@ export function DeviceConnection({
   onActivateMode,
   onDeactivateMode,
   onSendLayout,
+  onExportGpx
 }: DeviceConnectionProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -163,6 +165,12 @@ export function DeviceConnection({
                           variant="outline"
                         >
                           Send Layout
+                        </Button>
+                        <Button
+                          onClick={() => onExportGpx()}
+                          variant="outline"
+                        >
+                          Export Gpx
                         </Button>
                       </>
                     ) : (

@@ -27,6 +27,8 @@ namespace Backend
 
         private static readonly object _processingLock = new object();
 
+        private GpxTrail gpxTrail = new GpxTrail();
+
         public void SetWindow(PhotinoWindow window)
         {
             _window = window;
@@ -99,6 +101,7 @@ namespace Backend
                             if (p.packetType == "movement")
                             {
                                 ProcessSensors(p, controllerMapping.Mapping, controller);
+                                gpxTrail.Update(p);
                             }
                             else if (p.packetType == "command")
                             {
@@ -184,6 +187,7 @@ namespace Backend
                     string filePath = Path.Combine(screenshotsPath, fileName);
 
                     bitmap.Save(filePath, ImageFormat.Jpeg);
+                    gpxTrail.AddScreenshot(filePath);
                     Log($"Screen captured to {filePath}");
                 }
             }
@@ -191,6 +195,31 @@ namespace Backend
             {
                 Log($"Error capturing screen: {ex.Message}");
             }
+        }
+
+        public void ExportGpx()
+        {
+            string gpxPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "gpx");
+            try
+            {
+                Directory.CreateDirectory(gpxPath);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                gpxPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "gpx");
+                Directory.CreateDirectory(gpxPath);
+                Log($"Base directory not writable; falling back to {gpxPath}");
+            }
+            catch (Exception ex)
+            {
+                gpxPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "gpx");
+                Directory.CreateDirectory(gpxPath);
+                Log($"Could not create gpx directory in base dir: {ex.Message}. Falling back to {gpxPath}");
+            }
+
+            string fileName = $"gpx_{DateTime.Now:yyyyMMdd_HHmmssfff}.gpx";
+            string filePath = Path.Combine(gpxPath, fileName);
+            gpxTrail.Export(filePath);
         }
 
         private void ProcessButtons(Packet p, MappingConfig mapping, IXbox360Controller controller)
@@ -222,6 +251,8 @@ namespace Backend
                         case "down": controller.SetButtonState(Xbox360Button.Down, buttonEntry.Value); break;
                         case "left": controller.SetButtonState(Xbox360Button.Left, buttonEntry.Value); break;
                         case "right": controller.SetButtonState(Xbox360Button.Right, buttonEntry.Value); break;
+                        case "lefttrigger": controller.LeftTrigger = buttonEntry.Value ? (byte)255 : (byte)0; break;
+                        case "righttrigger": controller.RightTrigger = buttonEntry.Value ? (byte)255 : (byte)0; break;
                     }
                 }
             }
@@ -290,6 +321,9 @@ namespace Backend
                     {
                         smoothedAxisValues[axisEntry.Key] *= -1;
                     }
+
+                    float steering = smoothedAxisValues[axisEntry.Key];
+                    gpxTrail.SetSteering(steering);
 
                     short axisValue = (short)(smoothedAxisValues[axisEntry.Key] * 32767.0f);
                     SetControllerValue(controller, axisConfig.Target, axisValue);
@@ -415,28 +449,72 @@ namespace Backend
         {
             if (target == null) return;
 
-            switch (target)
+            switch (target.ToLower())
             {
                 // Axes (short)
-                case "LeftStickX":
+                case "leftstickx":
                     controller.LeftThumbX = (short)value;
                     break;
-                case "LeftStickY":
+                case "leftsticky":
                     controller.LeftThumbY = (short)value;
                     break;
-                case "RightStickX":
+                case "rightstickx":
                     controller.RightThumbX = (short)value;
                     break;
-                case "RightStickY":
+                case "rightsticky":
                     controller.RightThumbY = (short)value;
                     break;
 
                 // Triggers (byte)
-                case "LeftTrigger":
+                case "lefttrigger":
                     controller.LeftTrigger = (byte)value;
                     break;
-                case "RightTrigger":
+                case "righttrigger":
                     controller.RightTrigger = (byte)value;
+                    break;
+
+                // Buttons
+                case "a":
+                    controller.SetButtonState(Xbox360Button.A, Convert.ToBoolean(value));
+                    break;
+                case "b":
+                    controller.SetButtonState(Xbox360Button.B, Convert.ToBoolean(value));
+                    break;
+                case "x":
+                    controller.SetButtonState(Xbox360Button.X, Convert.ToBoolean(value));
+                    break;
+                case "y":
+                    controller.SetButtonState(Xbox360Button.Y, Convert.ToBoolean(value));
+                    break;
+                case "leftshoulder":
+                    controller.SetButtonState(Xbox360Button.LeftShoulder, Convert.ToBoolean(value));
+                    break;
+                case "rightshoulder":
+                    controller.SetButtonState(Xbox360Button.RightShoulder, Convert.ToBoolean(value));
+                    break;
+                case "leftstick":
+                    controller.SetButtonState(Xbox360Button.LeftThumb, Convert.ToBoolean(value));
+                    break;
+                case "rightstick":
+                    controller.SetButtonState(Xbox360Button.RightThumb, Convert.ToBoolean(value));
+                    break;
+                case "start":
+                    controller.SetButtonState(Xbox360Button.Start, Convert.ToBoolean(value));
+                    break;
+                case "back":
+                    controller.SetButtonState(Xbox360Button.Back, Convert.ToBoolean(value));
+                    break;
+                case "up":
+                    controller.SetButtonState(Xbox360Button.Up, Convert.ToBoolean(value));
+                    break;
+                case "down":
+                    controller.SetButtonState(Xbox360Button.Down, Convert.ToBoolean(value));
+                    break;
+                case "left":
+                    controller.SetButtonState(Xbox360Button.Left, Convert.ToBoolean(value));
+                    break;
+                case "right":
+                    controller.SetButtonState(Xbox360Button.Right, Convert.ToBoolean(value));
                     break;
             }
         }

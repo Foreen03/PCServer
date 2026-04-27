@@ -27,6 +27,8 @@
     <Compile Include="Program.cs" />
     <Compile Include="VigemController.cs" />
     <Compile Include="WebSocketHost.cs" />
+    <Compile Include="GpxTrail.cs"/>
+    <Compile Include="TrackPoint.cs"/>
     <None Include="app.manifest" />
   </ItemGroup>
 

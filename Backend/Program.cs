@@ -103,6 +103,9 @@ namespace Backend
                             _customPluginController.SendLayoutWithoutWindow(layout);
                         }
                         break;
+                    case "exportGpx":
+                        _vigemController.ExportGpx();
+                        break;
                 }
             });
 
