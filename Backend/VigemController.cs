@@ -47,6 +47,7 @@ namespace Backend
                 Log("No controller mapping file selected. Controller mapping will be disabled.");
                 return;
             }
+            Log($"Loaded controller mapping: {json}");
             controllerMapping = JsonConvert.DeserializeObject<ControllerMapping>(json);
         }
 
@@ -64,14 +65,17 @@ namespace Backend
             }
             catch (Exception ex)
             {
+                Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 Log($"Error initializing ViGEm client: {ex.Message}");
+                Log(ex.StackTrace);
+                Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 return;
             }
         }
 
         public void Deactivate()
         {
-            Log("Vigem Controller Deactivated");
+            Log("--- Vigem Controller Deactivated ---");
             if (controller != null)
             {
                 controller.Disconnect();
@@ -87,6 +91,8 @@ namespace Backend
             {
                 Packet? p = JsonConvert.DeserializeObject<Packet>(data);
                 if (p == null) return;
+                
+                Log(JsonConvert.SerializeObject(p, Formatting.Indented));
 
                 if (controllerMapping?.Mapping?.Enabled == true && controller != null)
                 {

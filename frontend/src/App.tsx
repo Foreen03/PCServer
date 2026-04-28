@@ -98,47 +98,58 @@ function editorReducer(
       };
 
     case "ADD_CONFLICT_RESOLUTION":
-        return {
-          ...state,
-          conflictsResolution: [...(state.conflictsResolution || []), action.payload],
-        };
-  
+      return {
+        ...state,
+        conflictsResolution: [
+          ...(state.conflictsResolution || []),
+          action.payload,
+        ],
+      };
+
     case "UPDATE_CONFLICT_RESOLUTION":
-        return {
-            ...state,
-            conflictsResolution: (state.conflictsResolution || []).map((cr, index) =>
-                index === action.payload.index ? { ...cr, ...action.payload.updates } : cr
-            ),
-        };
+      return {
+        ...state,
+        conflictsResolution: (state.conflictsResolution || []).map(
+          (cr, index) =>
+            index === action.payload.index
+              ? { ...cr, ...action.payload.updates }
+              : cr,
+        ),
+      };
 
     case "DELETE_CONFLICT_RESOLUTION":
-        return {
-            ...state,
-            conflictsResolution: (state.conflictsResolution || []).filter(
-                (_, index) => index !== action.payload
-            ),
-        };
-    
+      return {
+        ...state,
+        conflictsResolution: (state.conflictsResolution || []).filter(
+          (_, index) => index !== action.payload,
+        ),
+      };
+
     case "SET_CONFLICT_RESOLUTIONS":
-        return {
-            ...state,
-            conflictsResolution: action.payload,
-        };
+      return {
+        ...state,
+        conflictsResolution: action.payload,
+      };
 
     case "SET_CONTROLLER_MAPPING":
-        return {
-            ...state,
-            controllerMapping: action.payload,
-        };
-    
+      return {
+        ...state,
+        controllerMapping: action.payload,
+      };
+
     case "UPDATE_CONTROLLER_MAPPING":
-        return {
-            ...state,
-            controllerMapping: {
-                ...(state.controllerMapping || { enabled: false, buttonMap: {}, axisMap: {}, sensorMap: {} }),
-                ...action.payload,
-            },
-        };
+      return {
+        ...state,
+        controllerMapping: {
+          ...(state.controllerMapping || {
+            enabled: false,
+            buttonMap: {},
+            axisMap: {},
+            sensorMap: {},
+          }),
+          ...action.payload,
+        },
+      };
 
     default:
       return state;
@@ -258,7 +269,7 @@ export default function Page() {
     sendMessage({ action: "sendLayout" });
   };
 
-  const handleExportGpx = () => sendMessage({action: "exportGpx"})
+  const handleExportGpx = () => sendMessage({ action: "exportGpx" });
 
   if (view === "menu") {
     return (

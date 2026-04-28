@@ -1,7 +1,10 @@
 using Photino.NET;
 using System;
+using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Newtonsoft.Json.Linq;
 
 namespace Backend
@@ -103,6 +106,29 @@ namespace Backend
                             _customPluginController.SendLayoutWithoutWindow(layout);
                         }
                         break;
+                    case "saveGamepadJson":
+                        var jsonLayout = json["layout"]?.ToString();
+                        var requestedFileName = json["fileName"]?.ToString() ?? "gamepad.json";
+                        if (!string.IsNullOrEmpty(jsonLayout))
+                        {
+                            try
+                            {
+                                var savedPath = SaveGamepadJsonFile(jsonLayout, requestedFileName);
+                                if (!string.IsNullOrEmpty(savedPath))
+                                {
+                                    photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "saveStatus", status = "success", filePath = savedPath }));
+                                }
+                                else
+                                {
+                                    photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "saveStatus", status = "cancelled" }));
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "saveStatus", status = "error", error = ex.Message }));
+                            }
+                        }
+                        break;
                     case "exportGpx":
                         _vigemController.ExportGpx();
                         break;
@@ -118,6 +144,47 @@ namespace Backend
 #endif
 
             _window.WaitForClose();
+        }
+
+        private static string SaveGamepadJsonFile(string json, string defaultFileName)
+        {
+            var filePath = ShowSaveFileDialog(defaultFileName);
+            if (string.IsNullOrEmpty(filePath))
+            {
+                return string.Empty;
+            }
+
+            File.WriteAllText(filePath, json);
+            return filePath;
+        }
+
+        private static string ShowSaveFileDialog(string defaultFileName)
+        {
+            var filePath = string.Empty;
+
+            var thread = new Thread(() =>
+            {
+                using var saveFileDialog = new SaveFileDialog
+                {
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                    FilterIndex = 1,
+                    RestoreDirectory = true,
+                    DefaultExt = "json",
+                    FileName = defaultFileName,
+                };
+
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    filePath = saveFileDialog.FileName;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            return filePath;
         }
     }
 }

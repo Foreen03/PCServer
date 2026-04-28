@@ -53,12 +53,17 @@ export function GamepadEditor({
     resolve: () => void;
     reject: (error: string) => void;
   } | null>(null);
+  const savePromiseRef = useRef<{
+    resolve: () => void;
+    reject: (error: string) => void;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.external) {
       const messageHandler = (message: string) => {
         try {
           const parsedMessage = JSON.parse(message);
+
           if (parsedMessage.type === "log") {
             if (parsedMessage.message.includes("Layout sent successfully.")) {
               promiseRef.current?.resolve();
@@ -73,6 +78,19 @@ export function GamepadEditor({
               promiseRef.current = null;
             }
           }
+
+          if (parsedMessage.type === "saveStatus") {
+            if (parsedMessage.status === "success") {
+              savePromiseRef.current?.resolve();
+            } else if (parsedMessage.status === "cancelled") {
+              savePromiseRef.current?.reject("Save cancelled");
+            } else {
+              savePromiseRef.current?.reject(
+                parsedMessage.error || "Save failed",
+              );
+            }
+            savePromiseRef.current = null;
+          }
         } catch (e) {
           console.error("Failed to parse external message:", e);
         }
@@ -84,13 +102,42 @@ export function GamepadEditor({
 
   const handleExport = () => {
     const json = JSON.stringify(state, null, 2);
+    const fileName = `${state.gamepad.name.replace(/\s+/g, "_")}.json`;
+
+    if (
+      typeof window !== "undefined" &&
+      window.external &&
+      typeof window.external.sendMessage === "function"
+    ) {
+      const promise = new Promise<void>((resolve, reject) => {
+        savePromiseRef.current = { resolve, reject };
+      });
+
+      toast.promise(promise, {
+        loading: "Saving JSON...",
+        success: "JSON saved successfully",
+        error: (err) => String(err),
+        position: "top-center",
+      });
+
+      window.external.sendMessage(
+        JSON.stringify({
+          action: "saveGamepadJson",
+          layout: json,
+          fileName,
+        }),
+      );
+      return;
+    }
+
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${state.gamepad.name.replace(/\s+/g, "_")}.json`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("JSON saved to Downloads", { position: "top-center" });
   };
 
   const handleImport = () => {
