@@ -15,6 +15,7 @@
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
+    <PackageReference Include="SharpExifTool" Version="13.32.0.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,8 +28,9 @@
     <Compile Include="Program.cs" />
     <Compile Include="VigemController.cs" />
     <Compile Include="WebSocketHost.cs" />
-    <Compile Include="GpxTrail.cs"/>
-    <Compile Include="TrackPoint.cs"/>
+    <Compile Include="GpxTrail.cs" />
+    <Compile Include="TrackPoint.cs" />
+    <Compile Include="ScreenshotService.cs" />
     <None Include="app.manifest" />
   </ItemGroup>
 
@@ -49,18 +51,14 @@
       <Output TaskParameter="Include" ItemName="FrontendBuildOutput" />
     </CreateItem>
 
-    <Copy
-      SourceFiles="@(FrontendBuildOutput)"
-      DestinationFiles="@(FrontendBuildOutput->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(FrontendBuildOutput)" DestinationFiles="@(FrontendBuildOutput->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
   <Target Name="CopyWwwrootToPublish" BeforeTargets="Publish" DependsOnTargets="BuildFrontend">
     <ItemGroup>
       <WwwrootFiles Include="$(MSBuildProjectDirectory)\wwwroot\**\*" />
     </ItemGroup>
-    <Copy
-      SourceFiles="@(WwwrootFiles)"
-      DestinationFiles="@(WwwrootFiles->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(WwwrootFiles)" DestinationFiles="@(WwwrootFiles->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Message Importance="high" Text="Copied wwwroot to $(PublishDir)wwwroot" />
   </Target>
 

@@ -271,6 +271,10 @@ export default function Page() {
 
   const handleExportGpx = () => sendMessage({ action: "exportGpx" });
 
+  const handleStartGpx = (lat: number, lng: number) => {
+    sendMessage({ action: "startGpx", payload: { lat, lng } });
+  };
+
   if (view === "menu") {
     return (
       <MainMenu
@@ -295,6 +299,7 @@ export default function Page() {
         onDeactivateMode={handleDeactivateMode}
         onSendLayout={handleSendLayout}
         onExportGpx={handleExportGpx}
+        onStartGpx={handleStartGpx}
       />
     );
   }

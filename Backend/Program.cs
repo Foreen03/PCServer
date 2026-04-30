@@ -132,6 +132,15 @@ namespace Backend
                     case "exportGpx":
                         _vigemController.ExportGpx();
                         break;
+                    case "startGpx":
+                        var payload = json["payload"];
+                        if (payload != null)
+                        {
+                            var lat = payload["lat"]?.ToObject<double>() ?? 0.0;
+                            var lng = payload["lng"]?.ToObject<double>() ?? 0.0;
+                            _vigemController.StartNewTrail(lat, lng);
+                        }
+                        break;
                 }
             });
 

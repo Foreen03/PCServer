@@ -10,8 +10,26 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ArrowLeft, Cast } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import MapSelector from "./MapSelector";
+import L from "leaflet";
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
+// To fix the issue with the marker icon
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
+});
 interface DeviceConnectionProps {
   onBackToMenu: () => void;
   gattStatus: string;
@@ -24,6 +42,7 @@ interface DeviceConnectionProps {
   onDeactivateMode: () => void;
   onSendLayout: () => void;
   onExportGpx: () => void;
+  onStartGpx: (lat: number, lng: number) => void;
 }
 
 export function DeviceConnection({
@@ -37,13 +56,16 @@ export function DeviceConnection({
   onActivateMode,
   onDeactivateMode,
   onSendLayout,
-  onExportGpx
+  onExportGpx,
+  onStartGpx,
 }: DeviceConnectionProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
+  const [isMapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
+
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -172,6 +194,22 @@ export function DeviceConnection({
                         >
                           Export Gpx
                         </Button>
+                        <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline">Start GPX Trail</Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle>Select starting point</DialogTitle>
+                            </DialogHeader>
+                            <MapSelector
+                              onLocationSelect={(lat, lng) => {
+                                onStartGpx(lat, lng);
+                                setMapOpen(false);
+                              }}
+                            />
+                          </DialogContent>
+                        </Dialog>
                       </>
                     ) : (
                       <Button onClick={onDeactivateMode} variant="outline">

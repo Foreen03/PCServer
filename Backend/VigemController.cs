@@ -28,6 +28,7 @@ namespace Backend
         private static readonly object _processingLock = new object();
 
         private GpxTrail gpxTrail = new GpxTrail();
+        private ScreenshotService? _screenshotService;
 
         public void SetWindow(PhotinoWindow window)
         {
@@ -55,6 +56,7 @@ namespace Backend
         {
             Log("Vigem Controller Activated");
             LoadControllerMapping();
+            _screenshotService = new ScreenshotService(ScreenshotService.ResolveDirectory());
 
             try
             {
@@ -67,7 +69,7 @@ namespace Backend
             {
                 Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 Log($"Error initializing ViGEm client: {ex.Message}");
-                Log(ex.StackTrace);
+                Log(ex.StackTrace ?? "No stack trace available");
                 Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 return;
             }
@@ -91,7 +93,7 @@ namespace Backend
             {
                 Packet? p = JsonConvert.DeserializeObject<Packet>(data);
                 if (p == null) return;
-                
+
                 Log(JsonConvert.SerializeObject(p, Formatting.Indented));
 
                 if (controllerMapping?.Mapping?.Enabled == true && controller != null)
@@ -108,6 +110,8 @@ namespace Backend
                             {
                                 ProcessSensors(p, controllerMapping.Mapping, controller);
                                 gpxTrail.Update(p);
+                                _walkedDistance = gpxTrail.DistanceWalkedKm;
+                                _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "walked_distance", value = _walkedDistance }));
                             }
                             else if (p.packetType == "command")
                             {
@@ -120,7 +124,7 @@ namespace Backend
                         {
                             Log($"!!---- ERROR processing packet ----!!");
                             Log($"Error: {ex.Message}");
-                            Log($"Stack Trace: {ex.StackTrace}");
+                            Log($"Stack Trace: {ex.StackTrace ?? "No stack trace available"}");
                             Log($"Packet causing error: {data}");
                             Log($"!!---------------------------------!!");
                         }
@@ -133,6 +137,8 @@ namespace Backend
             }
         }
 
+        private double _walkedDistance = 0.0;
+
         private void ProcessCommand(Packet p, IXbox360Controller controller)
         {
             if (p.payload.TryGetValue("command", out var commandObj))
@@ -140,7 +146,7 @@ namespace Backend
                 var commandStr = commandObj?.ToString()?.ToLower();
                 if (commandStr == "screenshot")
                 {
-                    CaptureScreen();
+                    _ = CaptureScreenAsync();
                 }
                 else if (commandStr == "pause")
                 {
@@ -152,59 +158,41 @@ namespace Backend
             }
         }
 
-
-        private void CaptureScreen()
+        private async Task CaptureScreenAsync()
         {
-            if (Screen.PrimaryScreen == null)
+            if (_screenshotService == null)
             {
-                Log("Primary Screen is null");
+                Log("[Screenshot] ScreenshotService not initialised.");
                 return;
             }
 
-            try
+            var (lat, lon) = gpxTrail.CurrentPosition;
+
+            string? filePath = await _screenshotService.CaptureAsync(lat, lon);
+
+            if (filePath != null)
             {
-                Rectangle bounds = Screen.PrimaryScreen.Bounds;
-                using (Bitmap bitmap = new Bitmap(bounds.Width, bounds.Height))
-                {
-                    using (Graphics g = Graphics.FromImage(bitmap))
-                    {
-                        g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-                    }
-
-                    string screenshotsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "screenshots");
-                    try
-                    {
-                        Directory.CreateDirectory(screenshotsPath);
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        screenshotsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "screenshots");
-                        Directory.CreateDirectory(screenshotsPath);
-                        Log($"Base directory not writable; falling back to {screenshotsPath}");
-                    }
-                    catch (Exception ex)
-                    {
-                        screenshotsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "screenshots");
-                        Directory.CreateDirectory(screenshotsPath);
-                        Log($"Could not create screenshot directory in base dir: {ex.Message}. Falling back to {screenshotsPath}");
-                    }
-
-                    string fileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmssfff}.jpg";
-                    string filePath = Path.Combine(screenshotsPath, fileName);
-
-                    bitmap.Save(filePath, ImageFormat.Jpeg);
-                    gpxTrail.AddScreenshot(filePath);
-                    Log($"Screen captured to {filePath}");
-                }
+                gpxTrail.AddScreenshot(filePath);
+                Log($"[Screenshot] Captured + GPS tagged → {Path.GetFileName(filePath)}");
             }
-            catch (Exception ex)
+            else
             {
-                Log($"Error capturing screen: {ex.Message}");
+                Log("[Screenshot] Capture failed — check console for details.");
             }
+        }
+
+
+        public void StartNewTrail(Double startLat, double startLon)
+        {
+            gpxTrail = new GpxTrail();
+            gpxTrail.SetStartPoint(startLat, startLon);
+            gpxTrail.GenerateTrail();
         }
 
         public void ExportGpx()
         {
+            gpxTrail.AddMetadata("WalkedDistance", _walkedDistance.ToString());
+
             string gpxPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "gpx");
             try
             {
@@ -329,7 +317,7 @@ namespace Backend
                     }
 
                     float steering = smoothedAxisValues[axisEntry.Key];
-                    gpxTrail.SetSteering(steering);
+
 
                     short axisValue = (short)(smoothedAxisValues[axisEntry.Key] * 32767.0f);
                     SetControllerValue(controller, axisConfig.Target, axisValue);
