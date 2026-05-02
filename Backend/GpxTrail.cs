@@ -99,7 +99,6 @@ namespace Backend
 
                 var generatedPoints = new List<TrackPoint>();
 
-                // ✅ FIRST POINT = EXACT START
                 generatedPoints.Add(new TrackPoint
                 {
                     Lat = currentLat,
@@ -325,15 +324,6 @@ namespace Backend
                     writer.WriteLine("    </extensions>");
                 }
                 writer.WriteLine("  </metadata>");
-
-                // Waypoints — must precede <trk> per GPX spec
-                foreach (var s in Screenshots)
-                {
-                    writer.WriteLine($"  <wpt lat=\"{s.Lat:F7}\" lon=\"{s.Lon:F7}\">");
-                    writer.WriteLine("    <name>Screenshot</name>");
-                    writer.WriteLine($"    <desc>{EscapeXml(s.File)}</desc>");
-                    writer.WriteLine("  </wpt>");
-                }
 
                 writer.WriteLine("  <trk>");
                 writer.WriteLine("    <name>PhoneController Session</name>");

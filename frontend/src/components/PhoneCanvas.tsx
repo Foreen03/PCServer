@@ -73,12 +73,8 @@ export function PhoneCanvas({
 
     const compute = () => {
       const rect = container.getBoundingClientRect()
-      // Skip if container hasn't rendered with proper dimensions yet
-      if (rect.width < 50 || rect.height < 50) {
-        return
-      }
-      
-      // Reserve space for padding and label
+      if (rect.width < 50 || rect.height < 50) return
+
       const padX = 48
       const padY = 72
       const availW = rect.width - padX
@@ -88,27 +84,21 @@ export function PhoneCanvas({
 
       const scaleX = availW / frameW
       const scaleY = availH / frameH
-      // Use the smaller scale to fit, cap at 1 (don't enlarge beyond native)
       const newScale = Math.min(scaleX, scaleY, 1)
       setScale(newScale)
     }
 
-    // Initial compute after a short delay to ensure layout
     const initialTimer = setTimeout(compute, 50)
-    
-    // Also compute on any resize
-    const observer = new ResizeObserver(() => {
-      requestAnimationFrame(compute)
-    })
+    const observer = new ResizeObserver(() => requestAnimationFrame(compute))
     observer.observe(container)
-    
+
     return () => {
       clearTimeout(initialTimer)
       observer.disconnect()
     }
   }, [frameW, frameH])
 
-  // Track the screen element rect for drag calculations
+  // Track the screen element rect for drag/resize calculations
   useEffect(() => {
     const screen = screenRef.current
     if (!screen) return
@@ -119,11 +109,9 @@ export function PhoneCanvas({
     const timer = setTimeout(updateRect, 50)
     const observer = new ResizeObserver(() => updateRect())
     observer.observe(screen)
-    window.addEventListener("scroll", updateRect, true)
     return () => {
       clearTimeout(timer)
       observer.disconnect()
-      window.removeEventListener("scroll", updateRect, true)
     }
   }, [scale, deviceW, deviceH])
 
@@ -132,6 +120,20 @@ export function PhoneCanvas({
       dispatch({
         type: "UPDATE_COMPONENT",
         payload: { id, updates: { position: { x, y } } },
+      })
+    },
+    [dispatch]
+  )
+
+  const handleSizeAndPositionChange = useCallback(
+    (
+      id: string,
+      newPosition: { x: number; y: number },
+      newSize: { width: number; height: number }
+    ) => {
+      dispatch({
+        type: "UPDATE_COMPONENT",
+        payload: { id, updates: { position: newPosition, size: newSize } },
       })
     },
     [dispatch]
@@ -170,7 +172,7 @@ export function PhoneCanvas({
         }}
       />
 
-      {/* Phone frame wrapper - sized to the scaled dimensions for proper layout */}
+      {/* Phone frame wrapper */}
       <div
         className="z-10"
         style={{
@@ -178,7 +180,6 @@ export function PhoneCanvas({
           height: frameH * scale,
         }}
       >
-        {/* Phone frame - actual size, scaled via transform from top-left */}
         <div
           style={{
             width: frameW,
@@ -187,190 +188,159 @@ export function PhoneCanvas({
             transformOrigin: "top left",
           }}
         >
-            {/* Outer bezel */}
-            <div
-              className="absolute inset-0 border-[3px]"
-              style={{
-                borderColor: "hsl(240 4% 28%)",
-                borderRadius: outerRadius,
-                background: "linear-gradient(145deg, hsl(240 5% 14%), hsl(240 5% 8%))",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)",
-              }}
-            />
+          {/* Outer bezel */}
+          <div
+            className="absolute inset-0 border-[3px]"
+            style={{
+              borderColor: "hsl(240 4% 28%)",
+              borderRadius: outerRadius,
+              background: "linear-gradient(145deg, hsl(240 5% 14%), hsl(240 5% 8%))",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)",
+            }}
+          />
 
-            {/* Side button (power) */}
-            {device.bezelRadius > 10 && (
+          {/* Side button (power) */}
+          {device.bezelRadius > 10 && (
+            <div
+              className="absolute rounded-sm"
+              style={
+                isLandscape
+                  ? {
+                      bottom: -2,
+                      right: frameW * 0.3,
+                      width: 48,
+                      height: 4,
+                      background: "hsl(240 4% 22%)",
+                    }
+                  : {
+                      right: -2,
+                      top: frameH * 0.25,
+                      width: 4,
+                      height: 48,
+                      background: "hsl(240 4% 22%)",
+                    }
+              }
+            />
+          )}
+
+          {/* Screen */}
+          <div
+            ref={screenRef}
+            className="absolute overflow-hidden"
+            style={{
+              top: bezel,
+              left: bezel,
+              width: deviceW,
+              height: deviceH,
+              borderRadius: innerRadius,
+              backgroundColor: state.theme.backgroundColor,
+              backgroundImage:
+                bgImg.enabled && bgImg.value ? `url(${bgImg.value})` : undefined,
+              backgroundSize: bgSizeMap[bgImg.scaleType] || "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+            onClick={handleCanvasClick}
+          >
+            {/* Notch / Dynamic Island (iPhone) */}
+            {device.id.startsWith("iphone") && device.bezelRadius > 10 && (
               <div
-                className="absolute rounded-sm"
+                className="absolute z-20 rounded-full"
                 style={
                   isLandscape
-                    ? {
-                        bottom: -2,
-                        right: frameW * 0.3,
-                        width: 48,
-                        height: 4,
-                        background: "hsl(240 4% 22%)",
-                      }
-                    : {
-                        right: -2,
-                        top: frameH * 0.25,
-                        width: 4,
-                        height: 48,
-                        background: "hsl(240 4% 22%)",
-                      }
+                    ? { left: 6, top: "50%", transform: "translateY(-50%)", width: 24, height: 72, backgroundColor: "hsl(0 0% 0%)" }
+                    : { top: 6, left: "50%", transform: "translateX(-50%)", width: 72, height: 24, backgroundColor: "hsl(0 0% 0%)" }
                 }
               />
             )}
 
-            {/* Screen */}
+            {/* Camera punch-hole (Android) */}
+            {(device.id.startsWith("pixel") ||
+              device.id.startsWith("samsung-s") ||
+              device.id.startsWith("oneplus")) && (
+              <div
+                className="absolute z-20 rounded-full"
+                style={
+                  isLandscape
+                    ? { left: 10, top: "50%", transform: "translateY(-50%)", width: 12, height: 12, backgroundColor: "hsl(0 0% 0%)", border: "2px solid hsl(240 4% 20%)" }
+                    : { top: 10, left: "50%", transform: "translateX(-50%)", width: 12, height: 12, backgroundColor: "hsl(0 0% 0%)", border: "2px solid hsl(240 4% 20%)" }
+                }
+              />
+            )}
+
+            {/* Default pause button */}
             <div
-              ref={screenRef}
-              className="absolute overflow-hidden"
+              className="absolute z-30 flex items-center justify-center rounded-full pointer-events-none"
               style={{
-                top: bezel,
-                left: bezel,
-                width: deviceW,
-                height: deviceH,
-                borderRadius: innerRadius,
-                backgroundColor: state.theme.backgroundColor,
-                backgroundImage:
-                  bgImg.enabled && bgImg.value
-                    ? `url(${bgImg.value})`
-                    : undefined,
-                backgroundSize: bgSizeMap[bgImg.scaleType] || "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
+                top: Math.max(safeArea.top * deviceH + 8, 16),
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: Math.max(deviceW * 0.06, 28),
+                height: Math.max(deviceW * 0.06, 28),
+                backgroundColor: state.theme.button.color,
+                opacity: state.theme.button.pressedAlpha,
               }}
-              onClick={handleCanvasClick}
             >
-              {/* Notch / Dynamic Island (iPhone) */}
-              {device.id.startsWith("iphone") && device.bezelRadius > 10 && (
-                <div
-                  className="absolute z-20 rounded-full"
-                  style={
-                    isLandscape
-                      ? {
-                          left: 6,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          width: 24,
-                          height: 72,
-                          backgroundColor: "hsl(0 0% 0%)",
-                        }
-                      : {
-                          top: 6,
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          width: 72,
-                          height: 24,
-                          backgroundColor: "hsl(0 0% 0%)",
-                        }
-                  }
-                />
-              )}
-
-              {/* Camera punch-hole (Android) */}
-              {(device.id.startsWith("pixel") ||
-                device.id.startsWith("samsung-s") ||
-                device.id.startsWith("oneplus")) && (
-                <div
-                  className="absolute z-20 rounded-full"
-                  style={
-                    isLandscape
-                      ? {
-                          left: 10,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          width: 12,
-                          height: 12,
-                          backgroundColor: "hsl(0 0% 0%)",
-                          border: "2px solid hsl(240 4% 20%)",
-                        }
-                      : {
-                          top: 10,
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          width: 12,
-                          height: 12,
-                          backgroundColor: "hsl(0 0% 0%)",
-                          border: "2px solid hsl(240 4% 20%)",
-                        }
-                  }
-                />
-              )}
-
-              {/* Default pause button - top center (themed from button defaults) */}
-              <div
-                className="absolute z-30 flex items-center justify-center rounded-full pointer-events-none"
+              <Pause
                 style={{
-                  top: Math.max(safeArea.top * deviceH + 8, 16),
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: Math.max(deviceW * 0.06, 28),
-                  height: Math.max(deviceW * 0.06, 28),
-                  backgroundColor: state.theme.button.color,
-                  opacity: state.theme.button.pressedAlpha,
+                  width: Math.max(deviceW * 0.03, 14),
+                  height: Math.max(deviceW * 0.03, 14),
+                  color: state.theme.button.textColor,
                 }}
-              >
-                <Pause
-                  style={{
-                    width: Math.max(deviceW * 0.03, 14),
-                    height: Math.max(deviceW * 0.03, 14),
-                    color: state.theme.button.textColor,
-                  }}
-                  fill={state.theme.button.textColor}
-                />
-              </div>
+                fill={state.theme.button.textColor}
+              />
+            </div>
 
-              {/* Default eye-off icon - top left (not part of JSON) */}
-              <div
-                className="absolute z-30 flex items-center justify-center pointer-events-none"
+            {/* Eye-off icon */}
+            <div
+              className="absolute z-30 flex items-center justify-center pointer-events-none"
+              style={{
+                top: Math.max(safeArea.top * deviceH + 8, 16),
+                left: Math.max(safeArea.left * deviceW + 12, 16),
+                opacity: 0.6,
+              }}
+            >
+              <EyeOff
                 style={{
-                  top: Math.max(safeArea.top * deviceH + 8, 16),
-                  left: Math.max(safeArea.left * deviceW + 12, 16),
-                  opacity: 0.6,
-                }}
-              >
-                <EyeOff
-                  style={{
-                    width: Math.max(deviceW * 0.04, 18),
-                    height: Math.max(deviceW * 0.04, 18),
-                    color: "hsl(0 0% 20%)",
-                  }}
-                />
-              </div>
-
-              {/* Safe area guide */}
-              <div
-                className="absolute border border-dashed pointer-events-none z-[5]"
-                style={{
-                  borderColor: "rgba(255,255,255,0.12)",
-                  top: safeArea.top * deviceH,
-                  left: safeArea.left * deviceW,
-                  width: deviceW * (1 - safeArea.left - safeArea.right),
-                  height: deviceH * (1 - safeArea.top - safeArea.bottom),
+                  width: Math.max(deviceW * 0.04, 18),
+                  height: Math.max(deviceW * 0.04, 18),
+                  color: "hsl(0 0% 20%)",
                 }}
               />
-
-              {/* Gamepad components */}
-              {state.layout.components.map((comp) => (
-                <CanvasButton
-                  key={comp.id}
-                  component={comp}
-                  buttonTheme={state.theme.button}
-                  isSelected={selectedId === comp.id}
-                  canvasRect={screenRect}
-                  deviceWidth={deviceW}
-                  deviceHeight={deviceH}
-                  onSelect={onSelect}
-                  onPositionChange={handlePositionChange}
-                />
-              ))}
             </div>
+
+            {/* Safe area guide */}
+            <div
+              className="absolute border border-dashed pointer-events-none z-[5]"
+              style={{
+                borderColor: "rgba(255,255,255,0.12)",
+                top: safeArea.top * deviceH,
+                left: safeArea.left * deviceW,
+                width: deviceW * (1 - safeArea.left - safeArea.right),
+                height: deviceH * (1 - safeArea.top - safeArea.bottom),
+              }}
+            />
+
+            {/* Gamepad components */}
+            {state.layout.components.map((comp) => (
+              <CanvasButton
+                key={comp.id}
+                component={comp}
+                buttonTheme={state.theme.button}
+                isSelected={selectedId === comp.id}
+                canvasRect={screenRect}
+                deviceWidth={deviceW}
+                deviceHeight={deviceH}
+                onSelect={onSelect}
+                onPositionChange={handlePositionChange}
+                onSizeAndPositionChange={handleSizeAndPositionChange}
+              />
+            ))}
           </div>
         </div>
-      
-      {/* Device label - absolutely positioned at bottom */}
+      </div>
+
+      {/* Device label */}
       <div
         className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] font-mono text-center z-20"
         style={{ color: "hsl(240 4% 46%)" }}
