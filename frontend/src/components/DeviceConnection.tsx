@@ -43,6 +43,7 @@ interface DeviceConnectionProps {
   onSendLayout: () => void;
   onExportGpx: () => void;
   onStartGpx: (lat: number, lng: number) => void;
+  isGpxStarted: boolean;
 }
 
 export function DeviceConnection({
@@ -58,6 +59,7 @@ export function DeviceConnection({
   onSendLayout,
   onExportGpx,
   onStartGpx,
+  isGpxStarted,
 }: DeviceConnectionProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const [isMapOpen, setMapOpen] = useState(false);
@@ -143,6 +145,19 @@ export function DeviceConnection({
                     {activeMode || "None"}
                   </Badge>
                 </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    Gpx Trail:
+                  </span>
+                  <Badge
+                    variant={
+                      isGpxStarted ? "default" : "destructive"
+                    }
+                    className="capitalize"
+                  >
+                    {isGpxStarted?"Started":"Stopped"}
+                  </Badge>
+                </div>
               </div>
             </div>
 
@@ -188,15 +203,9 @@ export function DeviceConnection({
                         >
                           Send Layout
                         </Button>
-                        <Button
-                          onClick={() => onExportGpx()}
-                          variant="outline"
-                        >
-                          Export Gpx
-                        </Button>
                         <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
                           <DialogTrigger asChild>
-                            <Button variant="outline">Start GPX Trail</Button>
+                            <Button variant="outline" disabled={isGpxStarted}>Start GPX Trail</Button>
                           </DialogTrigger>
                           <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
@@ -210,6 +219,13 @@ export function DeviceConnection({
                             />
                           </DialogContent>
                         </Dialog>
+                        <Button
+                          onClick={() => onExportGpx()}
+                          variant="outline"
+                          disabled={!isGpxStarted}
+                        >
+                          Export Gpx
+                        </Button>
                       </>
                     ) : (
                       <Button onClick={onDeactivateMode} variant="outline">

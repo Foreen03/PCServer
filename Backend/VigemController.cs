@@ -2,16 +2,11 @@ using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
 using Newtonsoft.Json;
-using System.IO;
-using System.Windows.Forms;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Threading;
 using Photino.NET;
 
-using System.Drawing;
 using System.Drawing.Imaging;
+using RedCorners.ExifLibrary;
 
 namespace Backend
 {
@@ -28,7 +23,6 @@ namespace Backend
         private static readonly object _processingLock = new object();
 
         private GpxTrail gpxTrail = new GpxTrail();
-        private ScreenshotService? _screenshotService;
 
         public void SetWindow(PhotinoWindow window)
         {
@@ -56,8 +50,6 @@ namespace Backend
         {
             Log("Vigem Controller Activated");
             LoadControllerMapping();
-            _screenshotService = new ScreenshotService(ScreenshotService.ResolveDirectory());
-
             try
             {
                 vigemClient = new ViGEmClient();
@@ -146,7 +138,7 @@ namespace Backend
                 var commandStr = commandObj?.ToString()?.ToLower();
                 if (commandStr == "screenshot")
                 {
-                    _ = CaptureScreenAsync();
+                    CaptureScreen();
                 }
                 else if (commandStr == "pause")
                 {
@@ -158,26 +150,71 @@ namespace Backend
             }
         }
 
-        private async Task CaptureScreenAsync()
+        private void CaptureScreen()
         {
-            if (_screenshotService == null)
+            if (Screen.PrimaryScreen == null) { Log("Primary screen is null"); return; }
+
+            try
             {
-                Log("[Screenshot] ScreenshotService not initialised.");
-                return;
-            }
+                // 1. Capture screen
+                Rectangle bounds = Screen.PrimaryScreen.Bounds;
+                using var bitmap = new Bitmap(bounds.Width, bounds.Height);
+                using (var g = Graphics.FromImage(bitmap))
+                    g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
 
-            var (lat, lon) = gpxTrail.CurrentPosition;
+                string dir = ResolveDirectory(
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "screenshots"));
+                string filePath = Path.Combine(dir,
+                    $"screenshot_{DateTime.Now:yyyyMMdd_HHmmssfff}.jpg");
 
-            string? filePath = await _screenshotService.CaptureAsync(lat, lon);
+                bitmap.Save(filePath, ImageFormat.Jpeg);
 
-            if (filePath != null)
-            {
+                // 2. Write GPS EXIF directly into the saved JPEG
+                var (lat, lon) = gpxTrail.CurrentPosition;
+                WriteGpsToImage(filePath, lat, lon);
+
+                // 3. Register waypoint in GPX
                 gpxTrail.AddScreenshot(filePath);
-                Log($"[Screenshot] Captured + GPS tagged → {Path.GetFileName(filePath)}");
+                Log($"[Screenshot] Saved + GPS tagged → {Path.GetFileName(filePath)}");
             }
-            else
+            catch (Exception ex)
             {
-                Log("[Screenshot] Capture failed — check console for details.");
+                Log($"[Screenshot] Error: {ex.Message}");
+            }
+        }
+
+        private static void WriteGpsToImage(string filePath, double lat, double lon)
+        {
+            try
+            {
+                var file = ImageFile.FromFile(filePath);
+                file.SetGPSCoords((float)lat, (float)lon);
+                file.Properties.Set(ExifTag.DateTimeOriginal, DateTime.UtcNow);
+                file.Save(filePath);
+                Console.WriteLine($"[EXIF] GPS written: ({lat:F6}, {lon:F6})");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EXIF] Failed: {ex.Message}");
+            }
+        }
+
+        private static string ResolveDirectory(string primary)
+        {
+            try
+            {
+                Directory.CreateDirectory(primary);
+                string test = Path.Combine(primary, ".writetest");
+                File.WriteAllText(test, ""); File.Delete(test);
+                return primary;
+            }
+            catch
+            {
+                string fallback = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "PCServer", "screenshots");
+                Directory.CreateDirectory(fallback);
+                return fallback;
             }
         }
 
@@ -191,7 +228,7 @@ namespace Backend
 
         public void ExportGpx()
         {
-            gpxTrail.AddMetadata("WalkedDistance", _walkedDistance.ToString());
+            // gpxTrail.AddMetadata("WalkedDistance", _walkedDistance.ToString());
 
             string gpxPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "gpx");
             try

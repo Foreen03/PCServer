@@ -166,6 +166,7 @@ export default function Page() {
   const [activeMode, setActiveMode] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
+  const [isGpxStarted, setGpxStarted] = useState(false);
   const promiseRef = useRef<{
     resolve: () => void;
     reject: (error: string) => void;
@@ -250,10 +251,15 @@ export default function Page() {
   };
 
   const handleStartServer = () => sendMessage({ action: "startServer" });
-  const handleStopServer = () => sendMessage({ action: "stopServer" });
+  const handleStopServer = () => {
+    sendMessage({ action: "stopServer" });
+    setGpxStarted(false);
+  };
   const handleActivateMode = (mode: "vigem" | "custom") =>
     sendMessage({ action: "activateMode", mode });
-  const handleDeactivateMode = () => sendMessage({ action: "deactivateMode" });
+  const handleDeactivateMode = () => {
+    sendMessage({ action: "deactivateMode" });
+  };
   const handleSendLayout = () => {
     const promise = new Promise<void>((resolve, reject) => {
       promiseRef.current = { resolve, reject };
@@ -269,10 +275,14 @@ export default function Page() {
     sendMessage({ action: "sendLayout" });
   };
 
-  const handleExportGpx = () => sendMessage({ action: "exportGpx" });
+  const handleExportGpx = () => {
+    sendMessage({ action: "exportGpx" });
+    setGpxStarted(false);
+  };
 
   const handleStartGpx = (lat: number, lng: number) => {
     sendMessage({ action: "startGpx", payload: { lat, lng } });
+    setGpxStarted(true);
   };
 
   if (view === "menu") {
@@ -300,6 +310,7 @@ export default function Page() {
         onSendLayout={handleSendLayout}
         onExportGpx={handleExportGpx}
         onStartGpx={handleStartGpx}
+        isGpxStarted={isGpxStarted}
       />
     );
   }

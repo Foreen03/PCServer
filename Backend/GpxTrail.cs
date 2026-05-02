@@ -8,17 +8,14 @@ namespace Backend
 {
     public class GpxTrail
     {
-        // ── Configurable origin ────────────────────────────────────────────
         public double BaseLat { get; set; } = 3.2206334;
         public double BaseLon { get; set; } = 101.9676587;
 
         public double MetresPerDegree { get; set; } = 111_000.0;
 
-        // ── Motion parameters ──────────────────────────────────────────────
         public double MaxCadence { get; set; } = 180.0;
         public double MinCadence { get; set; } = 60.0;
 
-        // ── Python-algorithm parameters ────────────────────────────────────
         public double Scale { get; set; } = 0.0001;
         public double AngleVariability { get; set; } = Math.PI / 7.0;
         public double TotalDistanceKm { get; set; } = 1.932782;

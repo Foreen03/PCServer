@@ -15,7 +15,7 @@
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
-    <PackageReference Include="SharpExifTool" Version="13.32.0.1" />
+    <PackageReference Include="RedCorners.ExifLibrary" Version="2.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,7 +30,6 @@
     <Compile Include="WebSocketHost.cs" />
     <Compile Include="GpxTrail.cs" />
     <Compile Include="TrackPoint.cs" />
-    <Compile Include="ScreenshotService.cs" />
     <None Include="app.manifest" />
   </ItemGroup>
 
