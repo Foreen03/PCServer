@@ -318,7 +318,8 @@ export const CanvasButton = React.memo(function CanvasButton({
               ...style,
             }}
           />
-        ))}
+        ))
+      }
     </div>
   );
 });
