@@ -260,6 +260,12 @@ namespace Backend
 
         public Task StopServer()
         {
+            if (heartbeatTimer != null)
+            {
+                heartbeatTimer.Dispose();
+                heartbeatTimer = null;
+            }
+
             if (serviceProvider != null && serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
             {
                 serviceProvider.StopAdvertising();

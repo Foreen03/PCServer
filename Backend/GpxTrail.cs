@@ -215,9 +215,13 @@ namespace Backend
                     _distanceWalkedKm += Haversine(from.Lon, from.Lat, to.Lon, to.Lat);
                 }
 
-                _trailIndex = newIndex;
-
-                Track.Add((DateTimeOffset.FromUnixTimeMilliseconds(p.timeStamp).UtcDateTime, _trailIndex));
+                // Only record a keyframe when we actually advanced on the trail
+                // (prevents unbounded list growth at 60Hz — was adding ~216K entries/hour)
+                if (newIndex != _trailIndex)
+                {
+                    _trailIndex = newIndex;
+                    Track.Add((DateTimeOffset.FromUnixTimeMilliseconds(p.timeStamp).UtcDateTime, _trailIndex));
+                }
             }
         }
 

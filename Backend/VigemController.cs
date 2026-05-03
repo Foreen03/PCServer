@@ -22,6 +22,14 @@ namespace Backend
 
         private static readonly object _processingLock = new object();
 
+        // --- Throttling: prevent ViGEm driver overload (BSOD fix) ---
+        private DateTime _lastSubmitTime = DateTime.MinValue;
+        private static readonly TimeSpan _minSubmitInterval = TimeSpan.FromMilliseconds(8); // ~120Hz max
+
+        // --- Throttle walked_distance UI updates to ~1Hz ---
+        private DateTime _lastWalkedDistanceUpdate = DateTime.MinValue;
+        private static readonly TimeSpan _walkedDistanceInterval = TimeSpan.FromSeconds(1);
+
         private GpxTrail gpxTrail = new GpxTrail();
 
         public void SetWindow(PhotinoWindow window)
@@ -86,7 +94,7 @@ namespace Backend
                 Packet? p = JsonConvert.DeserializeObject<Packet>(data);
                 if (p == null) return;
 
-                Log(JsonConvert.SerializeObject(p, Formatting.Indented));
+                // Verbose per-packet logging removed — was flooding UI at 60Hz
 
                 if (controllerMapping?.Mapping?.Enabled == true && controller != null)
                 {
@@ -103,14 +111,27 @@ namespace Backend
                                 ProcessSensors(p, controllerMapping.Mapping, controller);
                                 gpxTrail.Update(p);
                                 _walkedDistance = gpxTrail.DistanceWalkedKm;
-                                _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "walked_distance", value = _walkedDistance }));
+
+                                // Throttle UI updates to ~1Hz to avoid flooding the UI thread
+                                var now = DateTime.UtcNow;
+                                if (now - _lastWalkedDistanceUpdate >= _walkedDistanceInterval)
+                                {
+                                    _lastWalkedDistanceUpdate = now;
+                                    _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "walked_distance", value = _walkedDistance }));
+                                }
                             }
                             else if (p.packetType == "command")
                             {
                                 ProcessCommand(p, controller);
                             }
 
-                            controller.SubmitReport();
+                            // Throttle SubmitReport to ~120Hz max to prevent ViGEm driver BSOD
+                            var submitNow = DateTime.UtcNow;
+                            if (submitNow - _lastSubmitTime >= _minSubmitInterval)
+                            {
+                                _lastSubmitTime = submitNow;
+                                controller.SubmitReport();
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -142,9 +163,18 @@ namespace Backend
                 }
                 else if (commandStr == "pause")
                 {
+                    // Press Start, submit, then release after delay — outside the main lock
                     controller.SetButtonState(Xbox360Button.Start, true);
-                    Thread.Sleep(50); // Simulate a brief button press
-                    controller.SetButtonState(Xbox360Button.Start, false);
+                    controller.SubmitReport();
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(50);
+                        lock (_processingLock)
+                        {
+                            controller.SetButtonState(Xbox360Button.Start, false);
+                            controller.SubmitReport();
+                        }
+                    });
                     Log("Game Paused");
                 }
             }
@@ -482,26 +512,26 @@ namespace Backend
 
             switch (target.ToLower())
             {
-                // Axes (short)
+                // Axes (short) — use Convert.ToInt16 to avoid InvalidCastException on boxed type mismatch
                 case "leftstickx":
-                    controller.LeftThumbX = (short)value;
+                    controller.LeftThumbX = Convert.ToInt16(value);
                     break;
                 case "leftsticky":
-                    controller.LeftThumbY = (short)value;
+                    controller.LeftThumbY = Convert.ToInt16(value);
                     break;
                 case "rightstickx":
-                    controller.RightThumbX = (short)value;
+                    controller.RightThumbX = Convert.ToInt16(value);
                     break;
                 case "rightsticky":
-                    controller.RightThumbY = (short)value;
+                    controller.RightThumbY = Convert.ToInt16(value);
                     break;
 
-                // Triggers (byte)
+                // Triggers (byte) — use Convert.ToByte to avoid InvalidCastException on boxed type mismatch
                 case "lefttrigger":
-                    controller.LeftTrigger = (byte)value;
+                    controller.LeftTrigger = Convert.ToByte(value);
                     break;
                 case "righttrigger":
-                    controller.RightTrigger = (byte)value;
+                    controller.RightTrigger = Convert.ToByte(value);
                     break;
 
                 // Buttons

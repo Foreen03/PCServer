@@ -89,19 +89,16 @@ namespace Backend
             string json = JsonConvert.SerializeObject(message);
             foreach (var c in _clients.Keys.ToList())
             {
-                Task.Run(() =>
+                try
                 {
-                    try
-                    {
-                        c.Send(json);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[WS] Send error to {c.ConnectionInfo.ClientIpAddress}: {ex.Message}");
-                        _clients.TryRemove(c, out _);
-                        _phoneSockets.TryRemove(c, out _);
-                    }
-                });
+                    c.Send(json);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[WS] Send error to {c.ConnectionInfo.ClientIpAddress}: {ex.Message}");
+                    _clients.TryRemove(c, out _);
+                    _phoneSockets.TryRemove(c, out _);
+                }
             }
         }
 
