@@ -24,7 +24,7 @@ namespace Backend
         private static readonly Guid NOTIFY_CHAR_UUID = Guid.Parse("12345678-1234-5678-1234-56789abcdef3");
 
         private string currentValue = "Hello BLE";
-        private int connectedDeviceCount = 0;
+        private volatile int connectedDeviceCount = 0;
         private readonly SemaphoreSlim _notifyLock = new SemaphoreSlim(1, 1);
 
         public event EventHandler<string>? OnDataReceived;
@@ -32,6 +32,12 @@ namespace Backend
         private System.Threading.Timer? heartbeatTimer;
         private const int heartbeatDelay = 1000;
         public event Action<bool>? OnControllerConnectionChanged;
+
+        // Reconnection detection: track whether we believe a device is connected
+        private volatile bool _isConnected = false;
+        // Timer to periodically poll SubscribedClients as a fallback
+        private System.Threading.Timer? _connectionPollTimer;
+        private const int CONNECTION_POLL_INTERVAL_MS = 2000;
 
         public async Task NotifyValueChanged(string value)
         {
@@ -150,13 +156,11 @@ namespace Backend
                 notifyCharacteristic = notifyCharResult.Characteristic;
                 notifyCharacteristic.SubscribedClientsChanged += OnSubscribedClientsChanged;
 
-                var advParams = new GattServiceProviderAdvertisingParameters
-                {
-                    IsDiscoverable = true,
-                    IsConnectable = true
-                };
+                StartAdvertising();
 
-                serviceProvider.StartAdvertising(advParams);
+                // Start polling SubscribedClients.Count as a fallback for missed events
+                _connectionPollTimer = new System.Threading.Timer(_ => PollConnectionState(), null,
+                    CONNECTION_POLL_INTERVAL_MS, CONNECTION_POLL_INTERVAL_MS);
 
                 Log("GATT Server started and advertising...");
                 Log("Please connect a BLE client from your device.");
@@ -164,6 +168,70 @@ namespace Backend
             catch (Exception ex)
             {
                 Log($"Error starting server: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Start or restart BLE advertising so clients can discover and connect.
+        /// </summary>
+        private void StartAdvertising()
+        {
+            if (serviceProvider == null) return;
+
+            try
+            {
+                // Stop first if already advertising (required before restarting)
+                if (serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
+                {
+                    serviceProvider.StopAdvertising();
+                }
+
+                var advParams = new GattServiceProviderAdvertisingParameters
+                {
+                    IsDiscoverable = true,
+                    IsConnectable = true
+                };
+
+                serviceProvider.StartAdvertising(advParams);
+                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Advertising started/restarted.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Error starting advertising: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Periodically polls SubscribedClients.Count to catch connection/disconnection
+        /// events that the OnSubscribedClientsChanged callback may have missed.
+        /// </summary>
+        private void PollConnectionState()
+        {
+            if (notifyCharacteristic == null) return;
+
+            try
+            {
+                int currentCount = notifyCharacteristic.SubscribedClients.Count;
+                bool wasConnected = _isConnected;
+                bool nowConnected = currentCount > 0;
+
+                if (nowConnected && !wasConnected)
+                {
+                    // Missed a connection event — handle reconnection
+                    Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [POLL] Detected reconnection (subscribers: {currentCount})");
+                    HandleDeviceConnected(currentCount);
+                }
+                else if (!nowConnected && wasConnected)
+                {
+                    // Missed a disconnection event
+                    Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [POLL] Detected disconnection (subscribers: {currentCount})");
+                    HandleDeviceDisconnected(currentCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Polling should never crash the app
+                Console.WriteLine($"[GattManager] Poll error: {ex.Message}");
             }
         }
 
@@ -208,6 +276,15 @@ namespace Backend
                 currentValue = receivedValue;
                 Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] MESSAGE RECEIVED: {receivedValue}");
 
+                // Reconnection detection: if we receive data but think we're disconnected,
+                // the phone has reconnected and we missed the SubscribedClientsChanged event.
+                if (!_isConnected)
+                {
+                    Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [WRITE] Detected reconnection via incoming data");
+                    int subCount = notifyCharacteristic?.SubscribedClients.Count ?? 0;
+                    HandleDeviceConnected(Math.Max(subCount, 1));
+                }
+
                 OnDataReceived?.Invoke(this, receivedValue);
 
                 if (request.Option == GattWriteOption.WriteWithResponse)
@@ -231,40 +308,86 @@ namespace Backend
 
             if (currentCount > connectedDeviceCount)
             {
-                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DEVICE CONNECTED. Total: {currentCount}");
-                if (currentCount > 0 && heartbeatTimer == null)
-                {
-                    Log("Starting heartbeat...");
-                    heartbeatTimer = new System.Threading.Timer(async _ =>
-                    {
-                        await SendHeartbeat();
-                    }, null, 0, heartbeatDelay);
-                }
-                WebSocketHost.Broadcast(new { type = "command", value = "controller_connected" });
+                HandleDeviceConnected(currentCount);
             }
             else if (currentCount < connectedDeviceCount)
             {
-                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DEVICE DISCONNECTED. Total: {currentCount}");
-                if (currentCount == 0 && heartbeatTimer != null)
-                {
-                    Log("Stopping heartbeat...");
-                    heartbeatTimer.Dispose();
-                    heartbeatTimer = null;
-                }
-                WebSocketHost.Broadcast(new { type = "command", value = "controller_disconnected" });
+                HandleDeviceDisconnected(currentCount);
             }
 
             connectedDeviceCount = currentCount;
-            _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "status", connected = currentCount > 0, count = currentCount }));
+        }
+
+        /// <summary>
+        /// Centralized handler for when a device connects or reconnects.
+        /// Safe to call multiple times — it's a no-op if already connected.
+        /// </summary>
+        private void HandleDeviceConnected(int currentCount)
+        {
+            if (_isConnected) return; // Already connected, avoid duplicate notifications
+
+            _isConnected = true;
+            connectedDeviceCount = currentCount;
+
+            Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DEVICE CONNECTED. Total: {currentCount}");
+
+            if (heartbeatTimer == null)
+            {
+                Log("Starting heartbeat...");
+                heartbeatTimer = new System.Threading.Timer(async _ =>
+                {
+                    await SendHeartbeat();
+                }, null, 0, heartbeatDelay);
+            }
+
+            WebSocketHost.Broadcast(new { type = "command", value = "controller_connected" });
+            _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "status", connected = true, count = currentCount }));
+        }
+
+        /// <summary>
+        /// Centralized handler for when a device disconnects.
+        /// Safe to call multiple times — it's a no-op if already disconnected.
+        /// Also restarts advertising so the phone can reconnect.
+        /// </summary>
+        private void HandleDeviceDisconnected(int currentCount)
+        {
+            if (!_isConnected) return; // Already disconnected, avoid duplicate notifications
+
+            _isConnected = false;
+            connectedDeviceCount = currentCount;
+
+            Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] DEVICE DISCONNECTED. Total: {currentCount}");
+
+            if (heartbeatTimer != null)
+            {
+                Log("Stopping heartbeat...");
+                heartbeatTimer.Dispose();
+                heartbeatTimer = null;
+            }
+
+            WebSocketHost.Broadcast(new { type = "command", value = "controller_disconnected" });
+            _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "status", connected = false, count = currentCount }));
+
+            // Restart advertising so the phone can discover and reconnect
+            StartAdvertising();
         }
 
         public Task StopServer()
         {
+            if (_connectionPollTimer != null)
+            {
+                _connectionPollTimer.Dispose();
+                _connectionPollTimer = null;
+            }
+
             if (heartbeatTimer != null)
             {
                 heartbeatTimer.Dispose();
                 heartbeatTimer = null;
             }
+
+            _isConnected = false;
+            connectedDeviceCount = 0;
 
             if (serviceProvider != null && serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
             {
