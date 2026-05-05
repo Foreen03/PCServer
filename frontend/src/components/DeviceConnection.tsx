@@ -165,13 +165,44 @@ export function DeviceConnection({
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Actions</h4>
               <div className="p-4 border rounded-lg space-y-4 bg-card">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {gattStatus === "stopped" ? (
                     <Button onClick={onStartServer}>Start GATT Server</Button>
                   ) : (
                     <Button onClick={onStopServer} variant="destructive">
                       Stop GATT Server
                     </Button>
+                  )}
+
+                  {gattStatus === "started" && connected && (
+                    <>
+                      {activeMode === "" ? (
+                        <>
+                          <Button
+                            onClick={() => onActivateMode("vigem")}
+                            variant="outline"
+                          >
+                            Activate Vigem Mode
+                          </Button>
+                          <Button
+                            onClick={() => onActivateMode("custom")}
+                            variant="outline"
+                          >
+                            Activate Custom Plugin
+                          </Button>
+                          <Button
+                            onClick={() => onSendLayout()}
+                            variant="outline"
+                          >
+                            Send Layout
+                          </Button>
+                        </>
+                      ) : (
+                        <Button onClick={onDeactivateMode} variant="outline">
+                          Deactivate Mode
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -180,62 +211,42 @@ export function DeviceConnection({
                     Waiting for a BLE client to connect...
                   </p>
                 )}
-
-                {gattStatus === "started" && connected && (
-                  <div className="flex flex-wrap gap-2">
-                    {activeMode === "" ? (
-                      <>
-                        <Button
-                          onClick={() => onActivateMode("vigem")}
-                          variant="outline"
-                        >
-                          Activate Vigem Mode
-                        </Button>
-                        <Button
-                          onClick={() => onActivateMode("custom")}
-                          variant="outline"
-                        >
-                          Activate Custom Plugin
-                        </Button>
-                        <Button
-                          onClick={() => onSendLayout()}
-                          variant="outline"
-                        >
-                          Send Layout
-                        </Button>
-                        <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" disabled={isGpxStarted}>Start GPX Trail</Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                              <DialogTitle>Select starting point</DialogTitle>
-                            </DialogHeader>
-                            <MapSelector
-                              onLocationSelect={(lat, lng) => {
-                                onStartGpx(lat, lng);
-                                setMapOpen(false);
-                              }}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          onClick={() => onExportGpx()}
-                          variant="outline"
-                          disabled={!isGpxStarted}
-                        >
-                          Export Gpx
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={onDeactivateMode} variant="outline">
-                        Deactivate Mode
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
+
+            {/* GPX Section */}
+            {gattStatus === "started" && connected && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-foreground">Gpx Trail</h4>
+                <div className="p-4 border rounded-lg bg-card">
+                  <div id="gpx" className="flex flex-wrap gap-2">
+                    <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" disabled={isGpxStarted}>Start GPX Trail</Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Select starting point</DialogTitle>
+                        </DialogHeader>
+                        <MapSelector
+                          onLocationSelect={(lat, lng) => {
+                            onStartGpx(lat, lng);
+                            setMapOpen(false);
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      onClick={() => onExportGpx()}
+                      variant="outline"
+                      disabled={!isGpxStarted}
+                    >
+                      Export Gpx
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Logs Section */}
             <div className="space-y-3">
