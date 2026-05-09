@@ -1,19 +1,28 @@
 "use client";
 
 import React, { useCallback, useRef, useState, useEffect } from "react";
-import type { GamepadComponent, ButtonTheme } from "@/lib/types";
+import type { GamepadComponent, SystemComponent, ButtonTheme, SafeArea } from "@/lib/types";
+import { getComponentLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Pause, Camera, EyeOff } from "lucide-react";
+
+const SYSTEM_COMPONENT_ICON: Record<string, React.FC<any>> = {
+  pause: Pause,
+  screenshot: Camera,
+  toggle_system_bar: EyeOff,
+};
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 interface CanvasButtonProps {
-  component: GamepadComponent;
+  component: GamepadComponent | SystemComponent;
   buttonTheme: ButtonTheme;
   isSelected: boolean;
   canvasRect: DOMRect | null;
   /** Logical device dimensions in dp (already orientation-adjusted) */
   deviceWidth: number;
   deviceHeight: number;
+  safeArea: SafeArea;
   onSelect: (id: string) => void;
   onPositionChange: (id: string, x: number, y: number) => void;
   onSizeAndPositionChange: (
@@ -30,6 +39,7 @@ export const CanvasButton = React.memo(function CanvasButton({
   canvasRect,
   deviceWidth,
   deviceHeight,
+  safeArea,
   onSelect,
   onPositionChange,
   onSizeAndPositionChange,
@@ -45,6 +55,20 @@ export const CanvasButton = React.memo(function CanvasButton({
 
   // Start geometry for resize is stored in a ref
   const startGeom = useRef({ x: 0, y: 0, w: 0, h: 0 });
+
+  // Safe area dimensions in device pixels
+  const safeLeftPx = safeArea.left * deviceWidth;
+  const safeTopPx = safeArea.top * deviceHeight;
+  const safeW = deviceWidth * (1 - safeArea.left - safeArea.right);
+  const safeH = deviceHeight * (1 - safeArea.top - safeArea.bottom);
+
+  // Convert normalized safe-area position to device pixels
+  const normToDevicePxX = (nx: number) => safeLeftPx + nx * safeW;
+  const normToDevicePxY = (ny: number) => safeTopPx + ny * safeH;
+
+  // Convert device pixels to normalized safe-area position
+  const devicePxToNormX = (px: number) => (px - safeLeftPx) / safeW;
+  const devicePxToNormY = (py: number) => (py - safeTopPx) / safeH;
 
   // Unified local state for smooth drag and resize
   const [localGeom, setLocalGeom] = useState({
@@ -64,6 +88,16 @@ export const CanvasButton = React.memo(function CanvasButton({
     });
   }, [component.position, component.size]);
 
+  // ─── Resolve per-component style with theme fallbacks ─────────────────────
+
+  const resolvedBgColor =
+    component.style?.backgroundColor ?? buttonTheme.backgroundColor;
+  const resolvedTextColor =
+    component.style?.textColor ?? buttonTheme.textColor;
+  const resolvedTextSizeSp =
+    component.type === "button" ? (component.style?.textSizeSp ?? buttonTheme.textSizeSp) : buttonTheme.textSizeSp;
+  const showBackground = component.type === "button" ? (component.style?.showBackground !== false) : true; // default true
+
   // ─── Drag ────────────────────────────────────────────────────────────────
 
   const handlePointerDown = useCallback(
@@ -75,7 +109,6 @@ export const CanvasButton = React.memo(function CanvasButton({
       onSelect(component.id);
       isDragging.current = true;
       startPos.current = { x: e.clientX, y: e.clientY };
-      // Start position is from the local state
       startNorm.current = { x: localGeom.x, y: localGeom.y };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     },
@@ -87,18 +120,22 @@ export const CanvasButton = React.memo(function CanvasButton({
       if (!canvasRect) return;
       e.preventDefault();
 
-      if (frame.current) return; // Already a frame requested
+      if (frame.current) return;
 
       frame.current = requestAnimationFrame(() => {
         frame.current = null;
 
+        // Safe area pixel dimensions on screen (rendered)
+        const screenSafeW = canvasRect.width * (1 - safeArea.left - safeArea.right);
+        const screenSafeH = canvasRect.height * (1 - safeArea.top - safeArea.bottom);
+
         // ── Drag ──────────────────────────────────────────────────────────
         if (isDragging.current) {
-          const deltaX = (e.clientX - startPos.current.x) / canvasRect.width;
-          const deltaY = (e.clientY - startPos.current.y) / canvasRect.height;
+          const deltaX = (e.clientX - startPos.current.x) / screenSafeW;
+          const deltaY = (e.clientY - startPos.current.y) / screenSafeH;
           const newX = Math.max(0, Math.min(1, startNorm.current.x + deltaX));
           const newY = Math.max(0, Math.min(1, startNorm.current.y + deltaY));
-          setLocalGeom((g) => ({ ...g, x: newX, y: newY })); // Update local state
+          setLocalGeom((g) => ({ ...g, x: newX, y: newY }));
           return;
         }
 
@@ -108,8 +145,9 @@ export const CanvasButton = React.memo(function CanvasButton({
         const corner = isResizing.current;
         const start = startGeom.current;
 
-        const startCX = start.x * deviceWidth;
-        const startCY = start.y * deviceHeight;
+        // Start center in device pixels (within safe area coordinate system)
+        const startCX = normToDevicePxX(start.x);
+        const startCY = normToDevicePxY(start.y);
         const startPxW = start.w * deviceWidth;
         const startPxH = start.h * deviceHeight;
 
@@ -121,6 +159,7 @@ export const CanvasButton = React.memo(function CanvasButton({
         const fixedTop = startCY - halfH;
         const fixedBottom = startCY + halfH;
 
+        // Current cursor in device pixels
         const curPxX =
           ((e.clientX - canvasRect.left) / canvasRect.width) * deviceWidth;
         const curPxY =
@@ -159,14 +198,15 @@ export const CanvasButton = React.memo(function CanvasButton({
         }
 
         setLocalGeom({
-          x: newCX / deviceWidth,
-          y: newCY / deviceHeight,
+          x: devicePxToNormX(newCX),
+          y: devicePxToNormY(newCY),
           w: newPxW / deviceWidth,
           h: newPxH / deviceHeight,
         });
       });
     },
-    [canvasRect, component.shape, deviceWidth, deviceHeight],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canvasRect, component.shape, deviceWidth, deviceHeight, safeArea],
   );
 
   const handlePointerUp = useCallback(
@@ -212,7 +252,6 @@ export const CanvasButton = React.memo(function CanvasButton({
         h = diameterPx / deviceHeight;
       }
 
-      // Use the current local state as the starting point for the resize
       startGeom.current = { x: localGeom.x, y: localGeom.y, w, h };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     },
@@ -231,10 +270,13 @@ export const CanvasButton = React.memo(function CanvasButton({
     pxH = diameter;
   }
 
-  const leftPx = localGeom.x * deviceWidth;
-  const topPx = localGeom.y * deviceHeight;
-  const fontSize = Math.max(8, buttonTheme.textSizeSp * (deviceHeight / 800));
+  // Position mapped to safe area
+  const leftPx = normToDevicePxX(localGeom.x);
+  const topPx = normToDevicePxY(localGeom.y);
+  const fontSize = Math.max(8, resolvedTextSizeSp * (deviceHeight / 800));
   const rectRadius = Math.min(pxW, pxH) * 0.3;
+
+  const displayLabel = getComponentLabel(component);
 
   const cornerHandles: { corner: ResizeCorner; style: React.CSSProperties }[] =
     [
@@ -256,6 +298,11 @@ export const CanvasButton = React.memo(function CanvasButton({
       },
     ];
 
+  // Determine background style
+  const bgStyle: React.CSSProperties = showBackground
+    ? { backgroundColor: resolvedBgColor }
+    : { backgroundColor: "transparent" };
+
   return (
     <div
       className={cn(
@@ -267,12 +314,14 @@ export const CanvasButton = React.memo(function CanvasButton({
         height: pxH,
         transform: `translate(calc(${leftPx}px - 50%), calc(${topPx}px - 50%))`,
         borderRadius: isCircle ? "50%" : `${rectRadius}px`,
-        backgroundColor: buttonTheme.color,
-        color: buttonTheme.textColor,
+        ...bgStyle,
+        color: resolvedTextColor,
         fontSize,
         boxShadow: isSelected
           ? "0 0 0 3px hsl(258 55% 58% / 0.8), 0 4px 16px rgba(0,0,0,0.4)"
-          : "0 2px 8px rgba(0,0,0,0.25)",
+          : showBackground
+            ? "0 2px 8px rgba(0,0,0,0.25)"
+            : "none",
         outline: isSelected ? "2px solid rgba(255,255,255,0.3)" : "none",
         outlineOffset: "4px",
       }}
@@ -281,11 +330,45 @@ export const CanvasButton = React.memo(function CanvasButton({
       onPointerUp={handlePointerUp}
       role="button"
       tabIndex={0}
-      aria-label={`${component.label} button`}
+      aria-label={`${displayLabel} button`}
     >
-      <span className="pointer-events-none font-semibold text-center leading-tight truncate px-1">
-        {component.label}
-      </span>
+      {/* Render content based on type */}
+      {component.type === "button" && component.content.type === "text" ? (
+        <span className="pointer-events-none font-semibold text-center leading-tight truncate px-1">
+          {component.content.text}
+        </span>
+      ) : component.type === "button" && component.content.type === "image" ? (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            overflow: "hidden",
+            borderRadius: isCircle ? "50%" : `${rectRadius}px`,
+          }}
+        >
+          <img
+            src={component.content.image.value}
+            alt={displayLabel}
+            className="w-full h-full"
+            style={{
+              objectFit:
+                component.content.image.scaleType === "fit"
+                  ? "contain"
+                  : "cover",
+            }}
+            draggable={false}
+          />
+        </div>
+      ) : component.type !== "button" ? (() => {
+        const Icon = SYSTEM_COMPONENT_ICON[component.type] || Pause;
+        const minDim = Math.min(pxW, pxH);
+        const iconSize = minDim * 0.5;
+        return (
+          <Icon
+            style={{ width: iconSize, height: iconSize, color: resolvedTextColor }}
+            fill={component.type === "pause" ? resolvedTextColor : "none"}
+          />
+        );
+      })() : null}
 
       {isSelected && (
         <div
@@ -318,8 +401,7 @@ export const CanvasButton = React.memo(function CanvasButton({
               ...style,
             }}
           />
-        ))
-      }
+        ))}
     </div>
   );
 });

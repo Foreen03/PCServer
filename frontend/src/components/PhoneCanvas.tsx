@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pause, EyeOff } from "lucide-react"
 import type { GamepadLayout, EditorAction } from "@/lib/types"
 import { CanvasButton } from "./CanvasButton"
 
@@ -30,6 +29,8 @@ export const PHONE_DEVICES: PhoneDevice[] = [
   { id: "samsung-tab-s9", name: "Samsung Galaxy Tab S9", width: 800, height: 1280, bezelRadius: 16 },
   { id: "custom-16-9", name: "Generic 16:9", width: 412, height: 732, bezelRadius: 32 },
 ]
+
+// ─── Phone Canvas ───────────────────────────────────────────────────────────
 
 interface PhoneCanvasProps {
   state: GamepadLayout
@@ -139,6 +140,29 @@ export function PhoneCanvas({
     [dispatch]
   )
 
+  const handleSystemComponentSizeAndPositionChange = useCallback(
+    (id: string, newPosition: { x: number; y: number }, newSize: { width: number; height: number }) => {
+      dispatch({
+        type: "UPDATE_SYSTEM_COMPONENT",
+        payload: {
+          id,
+          updates: { position: newPosition, size: newSize },
+        },
+      })
+    },
+    [dispatch],
+  )
+
+  const handleSystemComponentPositionChange = useCallback(
+    (id: string, x: number, y: number) => {
+      dispatch({
+        type: "UPDATE_SYSTEM_COMPONENT",
+        payload: { id, updates: { position: { x, y } } },
+      })
+    },
+    [dispatch]
+  )
+
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === screenRef.current) {
@@ -155,6 +179,8 @@ export function PhoneCanvas({
     fit: "contain",
     crop: "cover",
   }
+
+  const systemComponents = state.layout.systemComponents || []
 
   return (
     <div
@@ -268,46 +294,22 @@ export function PhoneCanvas({
               />
             )}
 
-            {/* Default pause button */}
-            <div
-              className="absolute z-30 flex items-center justify-center rounded-full pointer-events-none"
-              style={{
-                top: Math.max(safeArea.top * deviceH + 8, 16),
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: Math.max(deviceW * 0.06, 28),
-                height: Math.max(deviceW * 0.06, 28),
-                backgroundColor: state.theme.button.color,
-                opacity: state.theme.button.pressedAlpha,
-              }}
-            >
-              <Pause
-                style={{
-                  width: Math.max(deviceW * 0.03, 14),
-                  height: Math.max(deviceW * 0.03, 14),
-                  color: state.theme.button.textColor,
-                }}
-                fill={state.theme.button.textColor}
+            {/* System components */}
+            {systemComponents.map((sc) => (
+              <CanvasButton
+                key={sc.id}
+                component={sc}
+                buttonTheme={state.theme.button}
+                isSelected={selectedId === sc.id}
+                canvasRect={screenRect}
+                deviceWidth={deviceW}
+                deviceHeight={deviceH}
+                safeArea={safeArea}
+                onSelect={onSelect}
+                onPositionChange={handleSystemComponentPositionChange}
+                onSizeAndPositionChange={handleSystemComponentSizeAndPositionChange}
               />
-            </div>
-
-            {/* Eye-off icon */}
-            <div
-              className="absolute z-30 flex items-center justify-center pointer-events-none"
-              style={{
-                top: Math.max(safeArea.top * deviceH + 8, 16),
-                left: Math.max(safeArea.left * deviceW + 12, 16),
-                opacity: 0.6,
-              }}
-            >
-              <EyeOff
-                style={{
-                  width: Math.max(deviceW * 0.04, 18),
-                  height: Math.max(deviceW * 0.04, 18),
-                  color: "hsl(0 0% 20%)",
-                }}
-              />
-            </div>
+            ))}
 
             {/* Safe area guide */}
             <div
@@ -331,6 +333,7 @@ export function PhoneCanvas({
                 canvasRect={screenRect}
                 deviceWidth={deviceW}
                 deviceHeight={deviceH}
+                safeArea={safeArea}
                 onSelect={onSelect}
                 onPositionChange={handlePositionChange}
                 onSizeAndPositionChange={handleSizeAndPositionChange}

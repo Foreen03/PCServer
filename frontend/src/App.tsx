@@ -151,6 +151,42 @@ function editorReducer(
         },
       };
 
+    case "ADD_SYSTEM_COMPONENT":
+      return {
+        ...state,
+        layout: {
+          ...state.layout,
+          systemComponents: [
+            ...(state.layout.systemComponents || []),
+            action.payload,
+          ],
+        },
+      };
+
+    case "UPDATE_SYSTEM_COMPONENT":
+      return {
+        ...state,
+        layout: {
+          ...state.layout,
+          systemComponents: (state.layout.systemComponents || []).map((sc) =>
+            sc.id === action.payload.id
+              ? { ...sc, ...action.payload.updates }
+              : sc,
+          ),
+        },
+      };
+
+    case "DELETE_SYSTEM_COMPONENT":
+      return {
+        ...state,
+        layout: {
+          ...state.layout,
+          systemComponents: (state.layout.systemComponents || []).filter(
+            (sc) => sc.id !== action.payload,
+          ),
+        },
+      };
+
     default:
       return state;
   }

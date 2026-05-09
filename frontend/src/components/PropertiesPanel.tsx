@@ -15,6 +15,9 @@ import {
   GripVertical,
   Gamepad,
   ShieldCheck,
+  Monitor,
+  Image,
+  Type,
 } from "lucide-react";
 import type {
   GamepadLayout,
@@ -23,7 +26,9 @@ import type {
   ControllerMapping,
   AxisConfig,
   SensorConfig,
+  SystemComponentType,
 } from "@/lib/types";
+import { getComponentLabel } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -233,13 +238,13 @@ export function PropertiesPanel({
 
   const commandToLabelMap = new Map<string, string>();
   state.layout.components.forEach((c) => {
-    commandToLabelMap.set(c.command, c.label);
+    commandToLabelMap.set(c.command, getComponentLabel(c));
   });
 
   const availableCommandOptions = state.layout.components.reduce(
     (acc, comp) => {
       if (!acc.some((option) => option.command === comp.command)) {
-        acc.push({ command: comp.command, label: comp.label });
+        acc.push({ command: comp.command, label: getComponentLabel(comp) });
       }
       return acc;
     },
@@ -321,8 +326,8 @@ export function PropertiesPanel({
       position: { x: 0.5, y: 0.5 },
       size: { width: 0.15, height: 0.15 },
       shape: "circle",
-      label: "New",
       command: "new_command",
+      content: { type: "text", text: "New" },
     };
     dispatch({ type: "ADD_COMPONENT", payload: newComponent });
     onSelect(newId);
@@ -521,11 +526,11 @@ export function PropertiesPanel({
               </Label>
               <FieldRow label="Button Color">
                 <ColorInput
-                  value={state.theme.button.color}
+                  value={state.theme.button.backgroundColor}
                   onChange={(v) =>
                     dispatch({
                       type: "SET_BUTTON_THEME",
-                      payload: { color: v },
+                      payload: { backgroundColor: v },
                     })
                   }
                 />
@@ -601,6 +606,66 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
+          <Section icon={Monitor} title="System Components">
+            <div className="flex flex-col gap-1 px-4 pb-3">
+              {(state.layout.systemComponents || []).map((sc) => (
+                <div
+                  key={sc.id}
+                  className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors",
+                    selectedId === sc.id
+                      ? "bg-primary/15 border border-primary/30"
+                      : "hover:bg-secondary/50 border border-transparent",
+                  )}
+                  onClick={() => onSelect(sc.id)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="outline" className="text-[10px]">{sc.type}</Badge>
+                    <span className="text-xs text-muted-foreground truncate">{sc.id}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                    disabled={sc.id === "pause_button"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch({ type: "DELETE_SYSTEM_COMPONENT", payload: sc.id });
+                      if (selectedId === sc.id) onSelect(null);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Select
+                onValueChange={(v) => {
+                  const newId = `${v}_${Date.now()}`;
+                  dispatch({
+                    type: "ADD_SYSTEM_COMPONENT",
+                    payload: {
+                      type: v as SystemComponentType,
+                      id: newId,
+                      position: { x: 0.5, y: 0.05 },
+                      size: { width: 0.1, height: 0.1 },
+                      shape: "circle",
+                      style: { backgroundColor: "#6750A4", textColor: "#FFFFFF" },
+                    },
+                  });
+                  onSelect(newId);
+                }}
+              >
+                <SelectTrigger className="mt-2 h-8 text-xs">
+                  <SelectValue placeholder="Add system component..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="screenshot">Screenshot</SelectItem>
+                  <SelectItem value="toggle_system_bar">Toggle System Bar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </Section>
+          <Separator />
           <Section icon={Layers} title="Components">
             <div className="flex flex-col gap-1 px-4 pb-3">
               {state.layout.components.map((comp) => (
@@ -620,8 +685,11 @@ export function PropertiesPanel({
                     ) : (
                       <Square className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     )}
+                    {comp.content.type === "image" ? (
+                      <Image className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    ) : null}
                     <span className="text-xs font-medium text-foreground truncate">
-                      {comp.label}
+                      {getComponentLabel(comp)}
                     </span>
                     <span className="text-xs text-muted-foreground truncate">
                       {comp.id}
@@ -817,7 +885,7 @@ export function PropertiesPanel({
                     Button Map
                   </Label>
                   {state.layout.components.map((c) => (
-                    <FieldRow key={c.id} label={c.label}>
+                    <FieldRow key={c.id} label={getComponentLabel(c)}>
                       <Select
                         value={
                           state.controllerMapping?.buttonMap?.[c.command] ||
@@ -1128,67 +1196,100 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
+          
+          {/* Edit selected system component */}
+          {selectedId && !selectedComponent && (state.layout.systemComponents || []).find((sc) => sc.id === selectedId) && (() => {
+            const sc = (state.layout.systemComponents || []).find((s) => s.id === selectedId)!;
+            return (
+              <Section icon={Settings2} title={`Edit: ${sc.type}`}>
+                <div className="flex flex-col gap-3 px-4 pb-4">
+                  <FieldRow label="ID">
+                    <Input value={sc.id} readOnly className="h-8 text-xs font-mono" />
+                  </FieldRow>
+                  <FieldRow label="Type">
+                    <Input value={sc.type} readOnly className="h-8 text-xs" />
+                  </FieldRow>
+                  <Separator className="my-1" />
+                  <FieldRow label="Shape">
+                    <Select value={sc.shape}
+                      onValueChange={(v) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { shape: v as "circle" | "rectangle" } } })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="circle">Circle</SelectItem>
+                        <SelectItem value="rectangle">Rectangle</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FieldRow>
+                  <Separator className="my-1" />
+                  <Label className="text-xs text-foreground font-medium">Position</Label>
+                  <FieldRow label="X">
+                    <div className="flex items-center gap-2">
+                      <Slider value={[sc.position.x]} min={0} max={1} step={0.001} className="flex-1"
+                        onValueChange={([v]) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { position: { ...sc.position, x: v } } } })} />
+                      <Input type="number" value={sc.position.x.toFixed(3)} min={0} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                        onChange={(e) => { const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)); dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { position: { ...sc.position, x: v } } } }) }} />
+                    </div>
+                  </FieldRow>
+                  <FieldRow label="Y">
+                    <div className="flex items-center gap-2">
+                      <Slider value={[sc.position.y]} min={0} max={1} step={0.001} className="flex-1"
+                        onValueChange={([v]) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { position: { ...sc.position, y: v } } } })} />
+                      <Input type="number" value={sc.position.y.toFixed(3)} min={0} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                        onChange={(e) => { const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)); dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { position: { ...sc.position, y: v } } } }) }} />
+                    </div>
+                  </FieldRow>
+                  <Separator className="my-1" />
+                  <Label className="text-xs text-foreground font-medium">Size</Label>
+                  <FieldRow label="Width">
+                    <div className="flex items-center gap-2">
+                      <Slider value={[sc.size.width]} min={0.02} max={1} step={0.001} className="flex-1"
+                        onValueChange={([v]) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { size: { ...sc.size, width: v } } } })} />
+                      <Input type="number" value={sc.size.width.toFixed(3)} min={0.02} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                        onChange={(e) => { const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02)); dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { size: { ...sc.size, width: v } } } }) }} />
+                    </div>
+                  </FieldRow>
+                  <FieldRow label="Height">
+                    <div className="flex items-center gap-2">
+                      <Slider value={[sc.size.height]} min={0.02} max={1} step={0.001} className="flex-1"
+                        onValueChange={([v]) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { size: { ...sc.size, height: v } } } })} />
+                      <Input type="number" value={sc.size.height.toFixed(3)} min={0.02} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                        onChange={(e) => { const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02)); dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { size: { ...sc.size, height: v } } } }) }} />
+                    </div>
+                  </FieldRow>
+                  <Separator className="my-1" />
+                  <Label className="text-xs text-foreground font-medium">Style</Label>
+                  <FieldRow label="Background Color">
+                    <ColorInput value={sc.style?.backgroundColor || "#6750A4"}
+                      onChange={(v) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { style: { ...sc.style, backgroundColor: v } } } })} />
+                  </FieldRow>
+                  <FieldRow label="Text Color">
+                    <ColorInput value={sc.style?.textColor || "#FFFFFF"}
+                      onChange={(v) => dispatch({ type: "UPDATE_SYSTEM_COMPONENT", payload: { id: sc.id, updates: { style: { ...sc.style, textColor: v } } } })} />
+                  </FieldRow>
+                </div>
+              </Section>
+            );
+          })()}
           {selectedComponent && (
             <Section
               icon={Settings2}
-              title={`Edit: ${selectedComponent.label}`}
+              title={`Edit: ${getComponentLabel(selectedComponent)}`}
             >
               <div className="flex flex-col gap-3 px-4 pb-4">
                 <FieldRow label="ID">
-                  <Input
-                    value={selectedComponent.id}
-                    readOnly
-                    className="h-8 text-xs font-mono"
-                  />
-                </FieldRow>
-                <FieldRow label="Label">
-                  <Input
-                    value={selectedComponent.label}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "UPDATE_COMPONENT",
-                        payload: {
-                          id: selectedComponent.id,
-                          updates: { label: e.target.value },
-                        },
-                      })
-                    }
-                    className="h-8 text-xs"
-                  />
+                  <Input value={selectedComponent.id} readOnly className="h-8 text-xs font-mono" />
                 </FieldRow>
                 <FieldRow label="Command">
                   <Input
                     value={selectedComponent.command}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "UPDATE_COMPONENT",
-                        payload: {
-                          id: selectedComponent.id,
-                          updates: { command: e.target.value },
-                        },
-                      })
-                    }
+                    onChange={(e) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { command: e.target.value } } })}
                     className="h-8 text-xs font-mono"
                   />
                 </FieldRow>
                 <FieldRow label="Shape">
-                  <Select
-                    value={selectedComponent.shape}
-                    onValueChange={(v) =>
-                      dispatch({
-                        type: "UPDATE_COMPONENT",
-                        payload: {
-                          id: selectedComponent.id,
-                          updates: {
-                            shape: v as "circle" | "rectangle",
-                          },
-                        },
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={selectedComponent.shape}
+                    onValueChange={(v) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { shape: v as "circle" | "rectangle" } } })}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="circle">Circle</SelectItem>
                       <SelectItem value="rectangle">Rectangle</SelectItem>
@@ -1197,206 +1298,114 @@ export function PropertiesPanel({
                 </FieldRow>
 
                 <Separator className="my-1" />
+                <Label className="text-xs text-foreground font-medium">Content</Label>
+                <FieldRow label="Content Type">
+                  <Select value={selectedComponent.content.type}
+                    onValueChange={(v) => {
+                      if (v === "text") {
+                        dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { content: { type: "text", text: "New" } } } });
+                      } else {
+                        dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { content: { type: "image", image: { type: "url", value: "", scaleType: "fill" } } } } });
+                      }
+                    }}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text"><div className="flex items-center gap-1.5"><Type className="h-3 w-3" />Text</div></SelectItem>
+                      <SelectItem value="image"><div className="flex items-center gap-1.5"><Image className="h-3 w-3" />Image</div></SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FieldRow>
+                {selectedComponent.content.type === "text" && (
+                  <FieldRow label="Text">
+                    <Input value={selectedComponent.content.text}
+                      onChange={(e) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { content: { type: "text", text: e.target.value } } } })}
+                      className="h-8 text-xs" />
+                  </FieldRow>
+                )}
+                {selectedComponent.content.type === "image" && (() => {
+                  const imgContent = selectedComponent.content;
+                  return (
+                  <>
+                    <FieldRow label="Image URL">
+                      <Input value={imgContent.image.value}
+                        onChange={(e) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { content: { type: "image", image: { ...imgContent.image, value: e.target.value } } } } })}
+                        className="h-8 text-xs" placeholder="https://..." />
+                    </FieldRow>
+                    <FieldRow label="Scale Type">
+                      <Select value={imgContent.image.scaleType}
+                        onValueChange={(v) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { content: { type: "image", image: { ...imgContent.image, scaleType: v as "fill" | "fit" | "crop" } } } } })}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fill">Fill</SelectItem>
+                          <SelectItem value="fit">Fit</SelectItem>
+                          <SelectItem value="crop">Crop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FieldRow>
+                  </>
+                  );
+                })()}
 
-                <Label className="text-xs text-foreground font-medium">
-                  Position
-                </Label>
+                <Separator className="my-1" />
+                <Label className="text-xs text-foreground font-medium">Style Overrides</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Show Background</Label>
+                  <Switch checked={selectedComponent.style?.showBackground !== false}
+                    onCheckedChange={(v) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { style: { ...selectedComponent.style, showBackground: v } } } })} />
+                </div>
+                <FieldRow label="Background Color">
+                  <ColorInput value={selectedComponent.style?.backgroundColor || state.theme.button.backgroundColor}
+                    onChange={(v) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { style: { ...selectedComponent.style, backgroundColor: v } } } })} />
+                </FieldRow>
+                <FieldRow label="Text Color">
+                  <ColorInput value={selectedComponent.style?.textColor || state.theme.button.textColor}
+                    onChange={(v) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { style: { ...selectedComponent.style, textColor: v } } } })} />
+                </FieldRow>
+                <FieldRow label={`Pressed Alpha (${(selectedComponent.style?.pressedAlpha ?? state.theme.button.pressedAlpha).toFixed(2)})`}>
+                  <Slider value={[selectedComponent.style?.pressedAlpha ?? state.theme.button.pressedAlpha]} min={0} max={1} step={0.01}
+                    onValueChange={([v]) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { style: { ...selectedComponent.style, pressedAlpha: v } } } })} />
+                </FieldRow>
+                <FieldRow label="Text Size (sp)">
+                  <Input type="number" value={selectedComponent.style?.textSizeSp ?? state.theme.button.textSizeSp}
+                    onChange={(e) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { style: { ...selectedComponent.style, textSizeSp: Number(e.target.value) || 14 } } } })}
+                    className="h-8 text-xs" min={8} max={72} />
+                </FieldRow>
+
+                <Separator className="my-1" />
+                <Label className="text-xs text-foreground font-medium">Position</Label>
                 <FieldRow label="X">
                   <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.position.x]}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                x: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.position.x.toFixed(3)}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                x: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
+                    <Slider value={[selectedComponent.position.x]} min={0} max={1} step={0.001} className="flex-1"
+                      onValueChange={([v]) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { position: { ...selectedComponent.position, x: v } } } })} />
+                    <Input type="number" value={selectedComponent.position.x.toFixed(3)} min={0} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => { const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)); dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { position: { ...selectedComponent.position, x: v } } } }) }} />
                   </div>
                 </FieldRow>
                 <FieldRow label="Y">
                   <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.position.y]}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                y: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.position.y.toFixed(3)}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              position: {
-                                ...selectedComponent.position,
-                                y: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
+                    <Slider value={[selectedComponent.position.y]} min={0} max={1} step={0.001} className="flex-1"
+                      onValueChange={([v]) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { position: { ...selectedComponent.position, y: v } } } })} />
+                    <Input type="number" value={selectedComponent.position.y.toFixed(3)} min={0} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => { const v = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)); dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { position: { ...selectedComponent.position, y: v } } } }) }} />
                   </div>
                 </FieldRow>
 
                 <Separator className="my-1" />
-
-                <Label className="text-xs text-foreground font-medium">
-                  Size
-                </Label>
+                <Label className="text-xs text-foreground font-medium">Size</Label>
                 <FieldRow label="Width">
                   <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.size.width]}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                width: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.size.width.toFixed(3)}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                width: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
+                    <Slider value={[selectedComponent.size.width]} min={0.02} max={1} step={0.001} className="flex-1"
+                      onValueChange={([v]) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { size: { ...selectedComponent.size, width: v } } } })} />
+                    <Input type="number" value={selectedComponent.size.width.toFixed(3)} min={0.02} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => { const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02)); dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { size: { ...selectedComponent.size, width: v } } } }) }} />
                   </div>
                 </FieldRow>
                 <FieldRow label="Height">
                   <div className="flex items-center gap-2">
-                    <Slider
-                      value={[selectedComponent.size.height]}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="flex-1"
-                      onValueChange={([v]) =>
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                height: v,
-                              },
-                            },
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      value={selectedComponent.size.height.toFixed(3)}
-                      min={0.02}
-                      max={1}
-                      step={0.001}
-                      className="h-7 w-20 text-xs font-mono"
-                      onChange={(e) => {
-                        const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02))
-                        dispatch({
-                          type: "UPDATE_COMPONENT",
-                          payload: {
-                            id: selectedComponent.id,
-                            updates: {
-                              size: {
-                                ...selectedComponent.size,
-                                height: v,
-                              },
-                            },
-                          },
-                        })
-                      }}
-                    />
+                    <Slider value={[selectedComponent.size.height]} min={0.02} max={1} step={0.001} className="flex-1"
+                      onValueChange={([v]) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { size: { ...selectedComponent.size, height: v } } } })} />
+                    <Input type="number" value={selectedComponent.size.height.toFixed(3)} min={0.02} max={1} step={0.001} className="h-7 w-20 text-xs font-mono"
+                      onChange={(e) => { const v = Math.min(1, Math.max(0.02, parseFloat(e.target.value) || 0.02)); dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { size: { ...selectedComponent.size, height: v } } } }) }} />
                   </div>
                 </FieldRow>
               </div>

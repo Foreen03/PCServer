@@ -1,4 +1,5 @@
 import type { GamepadLayout } from "@/lib/types";
+import { getComponentLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useState, useRef, type MouseEvent } from "react";
@@ -105,13 +106,13 @@ export function DevicePreview({ layout, setLayout, selectedComponentId, setSelec
                                 top: `${component.position.y * 100}%`,
                                 width: `${component.size.width * 100}%`,
                                 height: `${component.size.height * 100}%`,
-                                backgroundColor: layout.theme.button.color,
-                                color: layout.theme.button.textColor,
-                                fontSize: `${layout.theme.button.textSizeSp}px`,
+                                backgroundColor: component.style?.backgroundColor || layout.theme.button.backgroundColor,
+                                color: component.style?.textColor || layout.theme.button.textColor,
+                                fontSize: `${component.style?.textSizeSp || layout.theme.button.textSizeSp}px`,
                                 transform: 'translate(-50%, -50%)',
                             }}
                         >
-                            {component.label}
+                            {component.content.type === "text" ? component.content.text : getComponentLabel(component)}
                         </div>
                     ))}
                 </div>

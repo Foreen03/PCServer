@@ -12,15 +12,66 @@ export type ComponentShape = "circle" | "rectangle"
 export type Orientation = "portrait" | "landscape"
 export type ScaleType = "fill" | "fit" | "crop"
 
+// ─── Content types ────────────────────────────────────────────────────────────
+
+export interface TextContent {
+  type: "text"
+  text: string
+}
+
+export interface ImageContent {
+  type: "image"
+  image: {
+    type: "url" | "base64"
+    value: string
+    scaleType: ScaleType
+  }
+}
+
+export type ButtonContent = TextContent | ImageContent
+
+// ─── Per-component style overrides ────────────────────────────────────────────
+
+export interface ComponentStyle {
+  backgroundColor?: string
+  textColor?: string
+  pressedAlpha?: number
+  textSizeSp?: number
+  showBackground?: boolean
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export interface GamepadComponent {
   type: "button"
   id: string
   position: Position
   size: Size
   shape: ComponentShape
-  label: string
   command: string
+  content: ButtonContent
+  style?: ComponentStyle
 }
+
+// ─── System Components ────────────────────────────────────────────────────────
+
+export type SystemComponentType = "pause" | "screenshot" | "toggle_system_bar"
+
+export interface SystemComponentStyle {
+  backgroundColor?: string
+  textColor?: string
+}
+
+export interface SystemComponent {
+  type: SystemComponentType
+  id: string
+  position: Position
+  size: Size
+  shape: ComponentShape
+  style?: SystemComponentStyle
+}
+
+// ─── Background Image ────────────────────────────────────────────────────────
 
 export interface BackgroundImage {
   enabled: boolean
@@ -29,18 +80,24 @@ export interface BackgroundImage {
   scaleType: ScaleType
 }
 
+// ─── Button Theme ─────────────────────────────────────────────────────────────
+
 export interface ButtonTheme {
-  color: string
+  backgroundColor: string
   pressedAlpha: number
   textColor: string
   textSizeSp: number
 }
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
 
 export interface Theme {
   backgroundColor: string
   backgroundImage: BackgroundImage
   button: ButtonTheme
 }
+
+// ─── Safe Area ────────────────────────────────────────────────────────────────
 
 export interface SafeArea {
   top: number
@@ -49,10 +106,15 @@ export interface SafeArea {
   right: number
 }
 
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
 export interface Layout {
   safeArea: SafeArea
   components: GamepadComponent[]
+  systemComponents?: SystemComponent[]
 }
+
+// ─── Conflict Resolution ──────────────────────────────────────────────────────
 
 export interface ConflictResolution {
   name: string;
@@ -61,34 +123,7 @@ export interface ConflictResolution {
   priority: string[];
 }
 
-export function isConflictResolution(obj: unknown): obj is ConflictResolution {
-  if (typeof obj !== "object" || obj === null) return false;
-  const cr = obj as ConflictResolution;
-  return (
-    typeof cr.name === "string" &&
-    cr.mode === "priority" &&
-    Array.isArray(cr.commands) &&
-    cr.commands.every((c) => typeof c === "string") &&
-    Array.isArray(cr.priority) &&
-    cr.priority.every((p) => typeof p === "string")
-  );
-}
-
-export interface Gamepad {
-  id: string
-  name: string
-  description: string
-  orientation: Orientation
-}
-
-export interface GamepadLayout {
-  version: number
-  gamepad: Gamepad
-  theme: Theme
-  layout: Layout
-  conflictsResolution?: ConflictResolution[]
-  controllerMapping?: ControllerMapping
-}
+// ─── Controller Mapping ───────────────────────────────────────────────────────
 
 export interface ButtonMap {
   [command: string]: string;
@@ -130,7 +165,26 @@ export interface ControllerMapping {
   sensorMap: SensorMap;
 }
 
-// Type guards and validators
+// ─── Gamepad ──────────────────────────────────────────────────────────────────
+
+export interface Gamepad {
+  id: string
+  name: string
+  description: string
+  orientation: Orientation
+}
+
+export interface GamepadLayout {
+  version: number
+  gamepad: Gamepad
+  theme: Theme
+  layout: Layout
+  conflictsResolution?: ConflictResolution[]
+  controllerMapping?: ControllerMapping
+}
+
+// ─── Type Guards ──────────────────────────────────────────────────────────────
+
 export function isPosition(obj: unknown): obj is Position {
   return (
     typeof obj === "object" &&
@@ -161,6 +215,36 @@ export function isScaleType(value: unknown): value is ScaleType {
   return value === "fill" || value === "fit" || value === "crop"
 }
 
+export function isButtonContent(obj: unknown): obj is ButtonContent {
+  if (typeof obj !== "object" || obj === null) return false
+  const c = obj as ButtonContent
+  if (c.type === "text") {
+    return typeof (c as TextContent).text === "string"
+  }
+  if (c.type === "image") {
+    const img = (c as ImageContent).image
+    if (typeof img !== "object" || img === null) return false
+    return (
+      (img.type === "url" || img.type === "base64") &&
+      typeof img.value === "string" &&
+      isScaleType(img.scaleType)
+    )
+  }
+  return false
+}
+
+export function isComponentStyle(obj: unknown): obj is ComponentStyle {
+  if (typeof obj !== "object" || obj === null) return false
+  // All fields are optional, so we just check types of present fields
+  const s = obj as ComponentStyle
+  if (s.backgroundColor !== undefined && typeof s.backgroundColor !== "string") return false
+  if (s.textColor !== undefined && typeof s.textColor !== "string") return false
+  if (s.pressedAlpha !== undefined && typeof s.pressedAlpha !== "number") return false
+  if (s.textSizeSp !== undefined && typeof s.textSizeSp !== "number") return false
+  if (s.showBackground !== undefined && typeof s.showBackground !== "boolean") return false
+  return true
+}
+
 export function isGamepadComponent(obj: unknown): obj is GamepadComponent {
   if (typeof obj !== "object" || obj === null) return false
   const c = obj as GamepadComponent
@@ -170,8 +254,34 @@ export function isGamepadComponent(obj: unknown): obj is GamepadComponent {
     isPosition(c.position) &&
     isSize(c.size) &&
     isComponentShape(c.shape) &&
-    typeof c.label === "string" &&
-    typeof c.command === "string"
+    typeof c.command === "string" &&
+    isButtonContent(c.content) &&
+    (c.style === undefined || isComponentStyle(c.style))
+  )
+}
+
+export function isSystemComponentType(value: unknown): value is SystemComponentType {
+  return value === "pause" || value === "screenshot" || value === "toggle_system_bar"
+}
+
+export function isSystemComponentStyle(obj: unknown): obj is SystemComponentStyle {
+  if (typeof obj !== "object" || obj === null) return false
+  const s = obj as SystemComponentStyle
+  if (s.backgroundColor !== undefined && typeof s.backgroundColor !== "string") return false
+  if (s.textColor !== undefined && typeof s.textColor !== "string") return false
+  return true
+}
+
+export function isSystemComponent(obj: unknown): obj is SystemComponent {
+  if (typeof obj !== "object" || obj === null) return false
+  const sc = obj as SystemComponent
+  return (
+    isSystemComponentType(sc.type) &&
+    typeof sc.id === "string" &&
+    isPosition(sc.position) &&
+    isSize(sc.size) &&
+    isComponentShape(sc.shape) &&
+    (sc.style === undefined || isSystemComponentStyle(sc.style))
   )
 }
 
@@ -190,7 +300,7 @@ export function isButtonTheme(obj: unknown): obj is ButtonTheme {
   if (typeof obj !== "object" || obj === null) return false
   const bt = obj as ButtonTheme
   return (
-    typeof bt.color === "string" &&
+    typeof bt.backgroundColor === "string" &&
     typeof bt.pressedAlpha === "number" &&
     typeof bt.textColor === "string" &&
     typeof bt.textSizeSp === "number"
@@ -221,11 +331,29 @@ export function isSafeArea(obj: unknown): obj is SafeArea {
 export function isLayout(obj: unknown): obj is Layout {
   if (typeof obj !== "object" || obj === null) return false
   const l = obj as Layout
-  return (
+  const baseValid =
     isSafeArea(l.safeArea) &&
     Array.isArray(l.components) &&
     l.components.every(isGamepadComponent)
-  )
+  if (!baseValid) return false
+  if (l.systemComponents !== undefined) {
+    if (!Array.isArray(l.systemComponents)) return false
+    if (!l.systemComponents.every(isSystemComponent)) return false
+  }
+  return true
+}
+
+export function isConflictResolution(obj: unknown): obj is ConflictResolution {
+  if (typeof obj !== "object" || obj === null) return false;
+  const cr = obj as ConflictResolution;
+  return (
+    typeof cr.name === "string" &&
+    cr.mode === "priority" &&
+    Array.isArray(cr.commands) &&
+    cr.commands.every((c) => typeof c === "string") &&
+    Array.isArray(cr.priority) &&
+    cr.priority.every((p) => typeof p === "string")
+  );
 }
 
 export function isGamepad(obj: unknown): obj is Gamepad {
@@ -237,30 +365,6 @@ export function isGamepad(obj: unknown): obj is Gamepad {
     typeof g.description === "string" &&
     isOrientation(g.orientation)
   )
-}
-
-export function isGamepadLayout(obj: unknown): obj is GamepadLayout {
-  if (typeof obj !== "object" || obj === null) return false
-  const gl = obj as GamepadLayout
-  const baseValidation =
-    typeof gl.version === "number" &&
-    isGamepad(gl.gamepad) &&
-    isTheme(gl.theme) &&
-    isLayout(gl.layout)
-
-  if (!baseValidation) return false
-
-  // Optional conflictsResolution
-  if (gl.conflictsResolution !== undefined) {
-    if (!Array.isArray(gl.conflictsResolution)) return false
-    if (!gl.conflictsResolution.every(isConflictResolution)) return false
-  }
-
-  if (gl.controllerMapping !== undefined) {
-    if (!isControllerMapping(gl.controllerMapping)) return false
-  }
-
-  return true
 }
 
 export function isControllerMapping(obj: unknown): obj is ControllerMapping {
@@ -328,6 +432,32 @@ export function isSensorThresholds(obj: unknown): obj is SensorThresholds {
     return typeof st.start === "number" && typeof st.stop === "number";
 }
 
+export function isGamepadLayout(obj: unknown): obj is GamepadLayout {
+  if (typeof obj !== "object" || obj === null) return false
+  const gl = obj as GamepadLayout
+  const baseValidation =
+    typeof gl.version === "number" &&
+    isGamepad(gl.gamepad) &&
+    isTheme(gl.theme) &&
+    isLayout(gl.layout)
+
+  if (!baseValidation) return false
+
+  // Optional conflictsResolution
+  if (gl.conflictsResolution !== undefined) {
+    if (!Array.isArray(gl.conflictsResolution)) return false
+    if (!gl.conflictsResolution.every(isConflictResolution)) return false
+  }
+
+  if (gl.controllerMapping !== undefined) {
+    if (!isControllerMapping(gl.controllerMapping)) return false
+  }
+
+  return true
+}
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+
 export interface ValidationResult {
   valid: boolean
   error?: string
@@ -360,7 +490,7 @@ export function validateGamepadLayout(data: unknown): ValidationResult {
     return { valid: false, error: "Invalid 'theme.backgroundImage': must have enabled (boolean), type ('url'|'base64'), value (string), scaleType ('fill'|'fit'|'crop')" }
   }
   if (!isButtonTheme(theme.button)) {
-    return { valid: false, error: "Invalid 'theme.button': must have color, textColor (strings), pressedAlpha, textSizeSp (numbers)" }
+    return { valid: false, error: "Invalid 'theme.button': must have backgroundColor, textColor (strings), pressedAlpha, textSizeSp (numbers)" }
   }
 
   if (!obj.layout || typeof obj.layout !== "object") {
@@ -378,7 +508,18 @@ export function validateGamepadLayout(data: unknown): ValidationResult {
 
   for (let i = 0; i < layout.components.length; i++) {
     if (!isGamepadComponent(layout.components[i])) {
-      return { valid: false, error: `Invalid component at index ${i}: must have type 'button', id, label, command (strings), position {x, y}, size {width, height}, shape ('circle'|'rectangle')` }
+      return { valid: false, error: `Invalid component at index ${i}: must have type 'button', id, command (strings), position {x, y}, size {width, height}, shape ('circle'|'rectangle'), content (text or image)` }
+    }
+  }
+
+  if (layout.systemComponents !== undefined) {
+    if (!Array.isArray(layout.systemComponents)) {
+      return { valid: false, error: "Invalid 'layout.systemComponents': expected an array" }
+    }
+    for (let i = 0; i < layout.systemComponents.length; i++) {
+      if (!isSystemComponent(layout.systemComponents[i])) {
+        return { valid: false, error: `Invalid system component at index ${i}: must have type ('pause'|'screenshot'|'toggle_system_bar'), id (string), position {x, y}, size {width, height}, shape ('circle'|'rectangle'|'round_rect')` }
+      }
     }
   }
 
@@ -402,7 +543,26 @@ export function validateGamepadLayout(data: unknown): ValidationResult {
   return { valid: true }
 }
 
-// Reducer action types
+// ─── Helper: get display label from a component ──────────────────────────────
+
+export const SYSTEM_COMPONENT_LABEL: Record<string, string> = {
+  pause: "Pause",
+  screenshot: "Screenshot",
+  toggle_system_bar: "Toggle System Bar",
+}
+
+export function getComponentLabel(comp: GamepadComponent | SystemComponent): string {
+  if (comp.type !== "button") {
+    return SYSTEM_COMPONENT_LABEL[comp.type] || comp.type
+  }
+  if (comp.content.type === "text") {
+    return comp.content.text || comp.id
+  }
+  return comp.id
+}
+
+// ─── Reducer Action Types ─────────────────────────────────────────────────────
+
 export type EditorAction =
   | { type: "SET_FULL_STATE"; payload: GamepadLayout }
   | { type: "SET_GAMEPAD_INFO"; payload: Partial<Gamepad> }
@@ -420,3 +580,6 @@ export type EditorAction =
   | { type: "SET_CONFLICT_RESOLUTIONS"; payload: ConflictResolution[] }
   | { type: "SET_CONTROLLER_MAPPING"; payload: ControllerMapping }
   | { type: "UPDATE_CONTROLLER_MAPPING"; payload: Partial<ControllerMapping> }
+  | { type: "ADD_SYSTEM_COMPONENT"; payload: SystemComponent }
+  | { type: "UPDATE_SYSTEM_COMPONENT"; payload: { id: string; updates: Partial<SystemComponent> } }
+  | { type: "DELETE_SYSTEM_COMPONENT"; payload: string }

@@ -2,7 +2,7 @@ import type { GamepadLayout } from "./types"
 
 // Empty layout for "New Layout"
 export const emptyLayout: GamepadLayout = {
-  version: 1,
+  version: 2,
   gamepad: {
     id: crypto.randomUUID?.() || `layout_${Date.now()}`,
     name: "New Layout",
@@ -18,7 +18,7 @@ export const emptyLayout: GamepadLayout = {
       scaleType: "fill",
     },
     button: {
-      color: "#6750A4",
+      backgroundColor: "#6750A4",
       pressedAlpha: 0.8,
       textColor: "#FFFFFF",
       textSizeSp: 24,
@@ -32,10 +32,43 @@ export const emptyLayout: GamepadLayout = {
       right: 0.04,
     },
     components: [],
+    systemComponents: [
+      {
+        type: "pause",
+        id: "pause_button",
+        position: { x: 0.5, y: 0.048 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: {
+          backgroundColor: "#6750A4",
+          textColor: "#FFFFFF",
+        },
+      },
+      {
+        type: "screenshot",
+        id: "screenshot_button",
+        position: { x: 0.024, y: 0.048 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: {
+          backgroundColor: "#FF9800",
+          textColor: "#FFFFFF",
+        },
+      },
+      {
+        type: "toggle_system_bar",
+        id: "toggle_system_bar",
+        position: { x: 0.112, y: 0.048 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: {
+          backgroundColor: "#2196F3",
+          textColor: "#0000FF",
+        },
+      },
+    ],
   },
-  conflictsResolution: [
-    
-  ],
+  conflictsResolution: [],
 }
 
 // Create a fresh empty layout with a new ID
@@ -46,12 +79,18 @@ export function createEmptyLayout(): GamepadLayout {
       ...emptyLayout.gamepad,
       id: crypto.randomUUID?.() || `layout_${Date.now()}`,
     },
+    layout: {
+      ...emptyLayout.layout,
+      systemComponents: emptyLayout.layout.systemComponents?.map((sc) => ({
+        ...sc,
+      })),
+    },
   }
 }
 
 // Sample layout (from NewLayout.json)
 export const defaultLayout: GamepadLayout = {
-  version: 1,
+  version: 2,
   gamepad: {
     id: "123456",
     name: "New Controller 2",
@@ -68,7 +107,7 @@ export const defaultLayout: GamepadLayout = {
       scaleType: "fill",
     },
     button: {
-      color: "#6750A4",
+      backgroundColor: "#6750A4",
       pressedAlpha: 0.6,
       textColor: "#FFFFFF",
       textSizeSp: 32,
@@ -88,8 +127,18 @@ export const defaultLayout: GamepadLayout = {
         position: { x: 0.25, y: 0.6 },
         size: { width: 0.36, height: 0.36 },
         shape: "circle",
-        label: "Jumps",
         command: "jump",
+        content: {
+          type: "text",
+          text: "Jump",
+        },
+        style: {
+          backgroundColor: "#4CAF50",
+          textColor: "#FFFFFF",
+          pressedAlpha: 0.4,
+          textSizeSp: 28,
+          showBackground: true,
+        },
       },
       {
         type: "button",
@@ -97,17 +146,70 @@ export const defaultLayout: GamepadLayout = {
         position: { x: 0.75, y: 0.6 },
         size: { width: 0.36, height: 0.36 },
         shape: "circle",
-        label: "Fires",
         command: "fire",
+        content: {
+          type: "image",
+          image: {
+            type: "url",
+            value:
+              "https://i.postimg.cc/65MnP8Fj/plufow-le-studio-5Q6y-ZN8cku-Y-unsplash.jpg",
+            scaleType: "fill",
+          },
+        },
+        style: {
+          showBackground: false,
+          pressedAlpha: 0.5,
+        },
+      },
+    ],
+    systemComponents: [
+      {
+        type: "pause",
+        id: "pause_button",
+        position: { x: 0.5, y: 0.048 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: {
+          backgroundColor: "#6750A4",
+          textColor: "#FFFF00",
+        },
+      },
+      {
+        type: "screenshot",
+        id: "screenshot_button",
+        position: { x: 0.024, y: 0.048 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: {
+          backgroundColor: "#FF9800",
+          textColor: "#FFFF00",
+        },
+      },
+      {
+        type: "toggle_system_bar",
+        id: "toggle_system_bar",
+        position: { x: 0.072, y: 0.048 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: {
+          backgroundColor: "#2196F3",
+          textColor: "#0000FF",
+        },
       },
     ],
   },
-  conflictsResolution: [],
+  conflictsResolution: [
+    {
+      name: "testing",
+      mode: "priority",
+      commands: ["fire", "jump"],
+      priority: ["fire", "jump"],
+    },
+  ],
   controllerMapping: {
     enabled: false,
     buttonMap: {},
     axisMap: {},
     sensorMap: {},
-  }
+  },
 }
-
