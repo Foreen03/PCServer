@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="Fleck" Version="1.2.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
@@ -21,6 +22,7 @@
   <ItemGroup>
     <Compile Include="ControllerMapping.cs" />
     <Compile Include="CustomPluginController.cs" />
+    <Compile Include="GamepadDatabase.cs" />
     <Compile Include="GattManager.cs" />
     <Compile Include="IController.cs" />
     <Compile Include="Packet.cs" />

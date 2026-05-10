@@ -26,6 +26,8 @@ namespace Backend
                 .SetSize(1024, 768)
                 .Center();
 
+            GamepadDatabase.Initialize();
+
             _gattManager.SetWindow(_window);
             _customPluginController.SetWindow(_window);
             _vigemController.SetWindow(_window);
@@ -139,6 +141,68 @@ namespace Backend
                             var lat = payload["lat"]?.ToObject<double>() ?? 0.0;
                             var lng = payload["lng"]?.ToObject<double>() ?? 0.0;
                             _vigemController.StartNewTrail(lat, lng);
+                        }
+                        break;
+
+                    case "saveGamepadToDb":
+                        try
+                        {
+                            var dbId = json["id"]?.ToString() ?? "";
+                            var dbName = json["name"]?.ToString() ?? "Untitled";
+                            var dbDescription = json["description"]?.ToString() ?? "";
+                            var dbOrientation = json["orientation"]?.ToString() ?? "landscape";
+                            var dbLayout = json["layout"]?.ToString() ?? "{}";
+                            GamepadDatabase.SaveGamepad(dbId, dbName, dbDescription, dbOrientation, dbLayout);
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbSaveResult", status = "success" }));
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbSaveResult", status = "error", error = ex.Message }));
+                        }
+                        break;
+
+                    case "getAllGamepads":
+                        try
+                        {
+                            var allGamepads = GamepadDatabase.GetAllGamepads();
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbGamepadList", gamepads = allGamepads }));
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbGamepadList", gamepads = new object[0], error = ex.Message }));
+                        }
+                        break;
+
+                    case "getGamepad":
+                        try
+                        {
+                            var getGamepadId = json["id"]?.ToString() ?? "";
+                            var gamepadJson = GamepadDatabase.GetGamepad(getGamepadId);
+                            if (gamepadJson != null)
+                            {
+                                photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbGamepadData", layout = gamepadJson }));
+                            }
+                            else
+                            {
+                                photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbGamepadData", layout = (string?)null, error = "Gamepad not found" }));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbGamepadData", layout = (string?)null, error = ex.Message }));
+                        }
+                        break;
+
+                    case "deleteGamepad":
+                        try
+                        {
+                            var deleteId = json["id"]?.ToString() ?? "";
+                            var deleted = GamepadDatabase.DeleteGamepad(deleteId);
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbDeleteResult", status = deleted ? "success" : "not_found" }));
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbDeleteResult", status = "error", error = ex.Message }));
                         }
                         break;
                 }

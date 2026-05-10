@@ -6,7 +6,19 @@ import { createEmptyLayout } from "@/lib/default-layout";
 import { GamepadEditor } from "@/components/GamepadEditor";
 import { MainMenu } from "@/components/MainMenu";
 import { DeviceConnection } from "@/components/DeviceConnection";
+import { GamepadLibrary } from "@/components/GamepadLibrary";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 function editorReducer(
   state: GamepadLayout,
@@ -192,7 +204,7 @@ function editorReducer(
   }
 }
 
-type AppView = "menu" | "editor" | "device-connection";
+type AppView = "menu" | "editor" | "device-connection" | "library";
 
 export default function Page() {
   const [view, setView] = useState<AppView>("menu");
@@ -203,34 +215,143 @@ export default function Page() {
   const [logs, setLogs] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const [isGpxStarted, setGpxStarted] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const pendingNavigationRef = useRef<(() => void) | null>(null);
   const promiseRef = useRef<{
     resolve: () => void;
     reject: (error: string) => void;
   } | null>(null);
+  const saveDbPromiseRef = useRef<{
+    resolve: () => void;
+    reject: (error: string) => void;
+  } | null>(null);
+
+  // Track dirty state: any dispatch after SET_FULL_STATE marks dirty
+  const lastSavedStateRef = useRef<string>("");
 
   const handleSelect = useCallback((id: string | null) => {
     setSelectedId(id);
   }, []);
 
+  // Check dirty state whenever state changes
+  useEffect(() => {
+    if (view === "editor") {
+      const currentJson = JSON.stringify(state);
+      setIsDirty(currentJson !== lastSavedStateRef.current);
+    }
+  }, [state, view]);
+
   const handleNewLayout = useCallback(() => {
-    dispatch({ type: "SET_FULL_STATE", payload: createEmptyLayout() });
+    const newLayout = createEmptyLayout();
+    dispatch({ type: "SET_FULL_STATE", payload: newLayout });
+    lastSavedStateRef.current = JSON.stringify(newLayout);
     setSelectedId(null);
+    setIsDirty(false);
     setView("editor");
   }, []);
 
-  const handleImportLayout = useCallback((layout: GamepadLayout) => {
+  const handleOpenLayout = useCallback((layout: GamepadLayout) => {
     dispatch({ type: "SET_FULL_STATE", payload: layout });
+    lastSavedStateRef.current = JSON.stringify(layout);
     setSelectedId(null);
+    setIsDirty(false);
     setView("editor");
+  }, []);
+
+  const handleOpenLibrary = useCallback(() => {
+    setView("library");
   }, []);
 
   const handleConnect = useCallback(() => {
     setView("device-connection");
   }, []);
 
+  // Navigation with unsaved-changes guard
+  const navigateWithGuard = useCallback(
+    (action: () => void) => {
+      if (isDirty) {
+        pendingNavigationRef.current = action;
+        setShowUnsavedDialog(true);
+      } else {
+        action();
+      }
+    },
+    [isDirty],
+  );
+
   const handleBackToMenu = useCallback(() => {
-    setView("menu");
+    if (view === "editor") {
+      navigateWithGuard(() => {
+        setView("menu");
+      });
+    } else {
+      setView("menu");
+    }
+  }, [view, navigateWithGuard]);
+
+  const handleUnsavedDialogSaveAndExit = useCallback(() => {
+    // Save then navigate
+    handleSaveToDb(() => {
+      setShowUnsavedDialog(false);
+      pendingNavigationRef.current?.();
+      pendingNavigationRef.current = null;
+    });
+  }, [state]);
+
+  const handleUnsavedDialogExit = useCallback(() => {
+    setShowUnsavedDialog(false);
+    setIsDirty(false);
+    pendingNavigationRef.current?.();
+    pendingNavigationRef.current = null;
   }, []);
+
+  const handleUnsavedDialogCancel = useCallback(() => {
+    setShowUnsavedDialog(false);
+    pendingNavigationRef.current = null;
+  }, []);
+
+  // Save to SQLite
+  const handleSaveToDb = useCallback(
+    (onSuccess?: () => void) => {
+      const sendMessage = (payload: object) => {
+        if (window.external && window.external.sendMessage) {
+          window.external.sendMessage(JSON.stringify(payload));
+        }
+      };
+
+      const jsonLayout = JSON.stringify(state, null, 2);
+
+      const promise = new Promise<void>((resolve, reject) => {
+        saveDbPromiseRef.current = {
+          resolve: () => {
+            lastSavedStateRef.current = jsonLayout;
+            setIsDirty(false);
+            resolve();
+            onSuccess?.();
+          },
+          reject,
+        };
+      });
+
+      toast.promise(promise, {
+        loading: "Saving to library...",
+        success: "Saved to library",
+        error: (err) => `Save failed: ${err}`,
+        position: "top-center",
+      });
+
+      sendMessage({
+        action: "saveGamepadToDb",
+        id: state.gamepad.id,
+        name: state.gamepad.name,
+        description: state.gamepad.description,
+        orientation: state.gamepad.orientation,
+        layout: jsonLayout,
+      });
+    },
+    [state],
+  );
 
   useEffect(() => {
     if (window.external && window.external.receiveMessage) {
@@ -261,6 +382,16 @@ export default function Page() {
               if (data.connected !== undefined) {
                 setConnected(data.connected);
               }
+              break;
+            case "dbSaveResult":
+              if (data.status === "success") {
+                saveDbPromiseRef.current?.resolve();
+              } else {
+                saveDbPromiseRef.current?.reject(
+                  data.error || "Unknown save error",
+                );
+              }
+              saveDbPromiseRef.current = null;
               break;
             case "data":
               break;
@@ -325,8 +456,17 @@ export default function Page() {
     return (
       <MainMenu
         onNewLayout={handleNewLayout}
-        onImportLayout={handleImportLayout}
+        onOpenLibrary={handleOpenLibrary}
         onConnect={handleConnect}
+      />
+    );
+  }
+
+  if (view === "library") {
+    return (
+      <GamepadLibrary
+        onBackToMenu={handleBackToMenu}
+        onOpenLayout={handleOpenLayout}
       />
     );
   }
@@ -352,13 +492,45 @@ export default function Page() {
   }
 
   return (
-    <GamepadEditor
-      state={state}
-      selectedId={selectedId}
-      onSelect={handleSelect}
-      dispatch={dispatch}
-      onBackToMenu={handleBackToMenu}
-      connected={connected}
-    />
+    <>
+      <GamepadEditor
+        state={state}
+        selectedId={selectedId}
+        onSelect={handleSelect}
+        dispatch={dispatch}
+        onBackToMenu={handleBackToMenu}
+        connected={connected}
+        onSaveToDb={() => handleSaveToDb()}
+        isDirty={isDirty}
+      />
+
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog
+        open={showUnsavedDialog}
+        onOpenChange={(open) => {
+          if (!open) handleUnsavedDialogCancel();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Would you like to save before leaving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleUnsavedDialogCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <Button variant="outline" onClick={handleUnsavedDialogExit}>
+              Exit without saving
+            </Button>
+            <AlertDialogAction onClick={handleUnsavedDialogSaveAndExit}>
+              Save and Exit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

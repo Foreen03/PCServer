@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Upload, Download, Smartphone, Monitor, ArrowLeft } from "lucide-react";
+import { Upload, Download, Smartphone, Monitor, ArrowLeft, Save } from "lucide-react";
 import type { GamepadLayout, EditorAction } from "@/lib/types";
 import {
   ResizablePanelGroup,
@@ -35,6 +35,8 @@ interface GamepadEditorProps {
   dispatch: React.Dispatch<EditorAction>;
   onBackToMenu?: () => void;
   connected: boolean;
+  onSaveToDb?: () => void;
+  isDirty?: boolean;
 }
 
 export function GamepadEditor({
@@ -44,6 +46,8 @@ export function GamepadEditor({
   dispatch,
   onBackToMenu,
   connected,
+  onSaveToDb,
+  isDirty,
 }: GamepadEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDevice, setSelectedDevice] = useState<PhoneDevice>(
@@ -305,6 +309,23 @@ export function GamepadEditor({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Toggle orientation</TooltipContent>
+            </Tooltip>
+
+            <div className="h-4 w-px bg-border" />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={isDirty ? "default" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onSaveToDb}
+                >
+                  <Save className="h-4 w-4" />
+                  <span className="sr-only">Save to Library</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Save to Library</TooltipContent>
             </Tooltip>
 
             <div className="h-4 w-px bg-border" />
