@@ -210,6 +210,7 @@ export default function Page() {
   const [view, setView] = useState<AppView>("menu");
   const [state, dispatch] = useReducer(editorReducer, createEmptyLayout());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const previousViewRef = useRef<AppView>("menu");
   const [gattStatus, setGattStatus] = useState("stopped");
   const [activeMode, setActiveMode] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -261,16 +262,18 @@ export default function Page() {
     lastSavedStateRef.current = JSON.stringify(newLayout);
     setSelectedId(null);
     setIsDirty(false);
+    previousViewRef.current = view;
     setView("editor");
-  }, []);
+  }, [view]);
 
   const handleOpenLayout = useCallback((layout: GamepadLayout) => {
     dispatch({ type: "SET_FULL_STATE", payload: layout });
     lastSavedStateRef.current = JSON.stringify(layout);
     setSelectedId(null);
     setIsDirty(false);
+    previousViewRef.current = view;
     setView("editor");
-  }, []);
+  }, [view]);
 
   const handleOpenLibrary = useCallback(() => {
     setView("library");
@@ -295,8 +298,9 @@ export default function Page() {
 
   const handleBackToMenu = useCallback(() => {
     if (view === "editor") {
+      const target = previousViewRef.current === "library" ? "library" : "menu";
       navigateWithGuard(() => {
-        setView("menu");
+        setView(target);
       });
     } else {
       setView("menu");
