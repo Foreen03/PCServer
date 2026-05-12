@@ -39,6 +39,8 @@ namespace Backend
         private System.Threading.Timer? _connectionPollTimer;
         private const int CONNECTION_POLL_INTERVAL_MS = 2000;
 
+        private readonly SemaphoreSlim _startStopLock = new SemaphoreSlim(1, 1);
+
         public async Task NotifyValueChanged(string value)
         {
             if (notifyCharacteristic != null && notifyCharacteristic.SubscribedClients.Count > 0)
@@ -86,8 +88,18 @@ namespace Backend
 
         public async Task StartServerAsync()
         {
+            if (!await _startStopLock.WaitAsync(0))
+            {
+                Log("StartServerAsync already in progress, ignoring duplicate call.");
+                return;
+            }
+
             try
             {
+                // Clean up any existing server first to avoid UUID conflicts
+                // and leaked OS-level BLE resources
+                await CleanupExistingServer();
+
                 var serviceResult = await GattServiceProvider.CreateAsync(SERVICE_UUID);
 
                 if (serviceResult.Error != BluetoothError.Success)
@@ -97,6 +109,12 @@ namespace Backend
                 }
 
                 serviceProvider = serviceResult.ServiceProvider;
+
+                // Listen for advertising status changes (e.g. OS stopping it unexpectedly)
+                serviceProvider.AdvertisementStatusChanged += (sender, args) =>
+                {
+                    Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [DIAG] AdvertisementStatusChanged => {sender.AdvertisementStatus}");
+                };
 
                 var readParams = new GattLocalCharacteristicParameters
                 {
@@ -169,6 +187,10 @@ namespace Backend
             {
                 Log($"Error starting server: {ex.Message}");
             }
+            finally
+            {
+                _startStopLock.Release();
+            }
         }
 
         /// <summary>
@@ -193,7 +215,9 @@ namespace Backend
                 };
 
                 serviceProvider.StartAdvertising(advParams);
-                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Advertising started/restarted.");
+
+                var status = serviceProvider.AdvertisementStatus;
+                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Advertising status: {status}");
             }
             catch (Exception ex)
             {
@@ -372,29 +396,83 @@ namespace Backend
             StartAdvertising();
         }
 
-        public Task StopServer()
+        public async Task StopServer()
         {
+            await _startStopLock.WaitAsync();
+            try
+            {
+                await CleanupExistingServer();
+                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] GATT Server stopped.");
+            }
+            finally
+            {
+                _startStopLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Fully tears down the GATT server: disposes timers, unsubscribes event handlers,
+        /// stops advertising, and releases the service provider so the BLE stack is clean
+        /// for a fresh StartServerAsync() call.
+        /// </summary>
+        private async Task CleanupExistingServer()
+        {
+            // 1. Stop the connection poll timer
             if (_connectionPollTimer != null)
             {
                 _connectionPollTimer.Dispose();
                 _connectionPollTimer = null;
             }
 
+            // 2. Stop the heartbeat timer and wait for any in-flight callback to drain
             if (heartbeatTimer != null)
             {
                 heartbeatTimer.Dispose();
                 heartbeatTimer = null;
+                // Allow any in-flight heartbeat callback to finish and release _notifyLock
+                await Task.Delay(50);
             }
 
+            // 3. Reset connection state
             _isConnected = false;
             connectedDeviceCount = 0;
 
-            if (serviceProvider != null && serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
+            // 4. Unsubscribe event handlers to prevent stacking on re-start
+            if (readCharacteristic != null)
             {
-                serviceProvider.StopAdvertising();
-                Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] GATT Server stopped.");
+                readCharacteristic.ReadRequested -= OnReadRequested;
+                readCharacteristic = null;
             }
-            return Task.CompletedTask;
+
+            if (writeCharacteristic != null)
+            {
+                writeCharacteristic.WriteRequested -= OnWriteRequested;
+                writeCharacteristic = null;
+            }
+
+            if (notifyCharacteristic != null)
+            {
+                notifyCharacteristic.SubscribedClientsChanged -= OnSubscribedClientsChanged;
+                notifyCharacteristic = null;
+            }
+
+            // 5. Stop advertising and release the service provider so the OS frees the BLE registration
+            if (serviceProvider != null)
+            {
+                try
+                {
+                    if (serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
+                    {
+                        serviceProvider.StopAdvertising();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Error stopping advertising during cleanup: {ex.Message}");
+                }
+
+                serviceProvider = null;
+            }
         }
 
         private async Task SendHeartbeat()
