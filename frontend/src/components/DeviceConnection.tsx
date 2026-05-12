@@ -9,11 +9,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Cast } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Cast, Gamepad2, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -30,6 +31,17 @@ L.Icon.Default.mergeOptions({
   iconUrl,
   shadowUrl,
 });
+
+interface GamepadSummary {
+  Id: string;
+  Name: string;
+  Description: string;
+  Orientation: string;
+  Version: number;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
 interface DeviceConnectionProps {
   onBackToMenu: () => void;
   gattStatus: string;
@@ -38,12 +50,17 @@ interface DeviceConnectionProps {
   connected: boolean;
   onStartServer: () => void;
   onStopServer: () => void;
-  onActivateMode: (mode: "vigem" | "custom") => void;
+  onActivateMode: (mode: "vigem" | "custom", controllerMappingJson?: string) => void;
   onDeactivateMode: () => void;
   onSendLayout: () => void;
   onExportGpx: () => void;
   onStartGpx: (lat: number, lng: number) => void;
   isGpxStarted: boolean;
+  sendMessage: (payload: object) => void;
+  vigemGamepads: GamepadSummary[];
+  loadingVigemGamepads: boolean;
+  onRequestVigemGamepads: () => void;
+  onFetchGamepadForVigem: (gamepadId: string) => Promise<string>;
 }
 
 export function DeviceConnection({
@@ -60,14 +77,50 @@ export function DeviceConnection({
   onExportGpx,
   onStartGpx,
   isGpxStarted,
+  vigemGamepads,
+  loadingVigemGamepads,
+  onRequestVigemGamepads,
+  onFetchGamepadForVigem,
 }: DeviceConnectionProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const [isMapOpen, setMapOpen] = useState(false);
+  const [isVigemDialogOpen, setVigemDialogOpen] = useState(false);
+  const [loadingGamepadId, setLoadingGamepadId] = useState<string | null>(null);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
+  const handleOpenVigemDialog = useCallback(() => {
+    setVigemDialogOpen(true);
+    onRequestVigemGamepads();
+  }, [onRequestVigemGamepads]);
+
+  const handleSelectGamepad = useCallback(
+    async (gamepad: GamepadSummary) => {
+      setLoadingGamepadId(gamepad.Id);
+      try {
+        const layoutJson = await onFetchGamepadForVigem(gamepad.Id);
+        // Parse the layout JSON to extract controllerMapping
+        try {
+          const layoutObj = JSON.parse(layoutJson);
+          const controllerMapping = layoutObj.controllerMapping;
+          if (controllerMapping) {
+            const mappingJson = JSON.stringify({ controllerMapping });
+            onActivateMode("vigem", mappingJson);
+          } else {
+            onActivateMode("vigem", "");
+          }
+        } catch {
+          onActivateMode("vigem", "");
+        }
+        setVigemDialogOpen(false);
+      } finally {
+        setLoadingGamepadId(null);
+      }
+    },
+    [onFetchGamepadForVigem, onActivateMode],
+  );
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -179,7 +232,7 @@ export function DeviceConnection({
                       {activeMode === "" ? (
                         <>
                           <Button
-                            onClick={() => onActivateMode("vigem")}
+                            onClick={handleOpenVigemDialog}
                             variant="outline"
                           >
                             Activate Vigem Mode
@@ -263,6 +316,75 @@ export function DeviceConnection({
             </p>
           </div>
         </ScrollArea>
+
+        {/* Vigem Gamepad Selection Dialog */}
+        <Dialog open={isVigemDialogOpen} onOpenChange={setVigemDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Select Mapping for ViGEm</DialogTitle>
+              <DialogDescription>
+                Choose a gamepad with controller mapping enabled to use with ViGEm mode.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              {loadingVigemGamepads ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">Loading gamepads...</span>
+                </div>
+              ) : vigemGamepads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Gamepad2 className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    No gamepads with controller mapping enabled found.
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Enable controller mapping in the gamepad editor first.
+                  </p>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[300px]">
+                  <div className="space-y-2">
+                    {vigemGamepads.map((gp) => (
+                      <button
+                        key={gp.Id}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/60 transition-colors text-left disabled:opacity-50"
+                        onClick={() => handleSelectGamepad(gp)}
+                        disabled={loadingGamepadId !== null}
+                      >
+                        <div className="flex-shrink-0 w-9 h-9 rounded-md bg-primary/15 flex items-center justify-center">
+                          {loadingGamepadId === gp.Id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : (
+                            <Gamepad2 className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {gp.Name}
+                          </p>
+                          {gp.Description && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {gp.Description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0 flex flex-col items-end gap-0.5">
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {gp.Orientation}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            v{gp.Version}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );

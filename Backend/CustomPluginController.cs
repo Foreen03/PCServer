@@ -136,6 +136,7 @@ namespace Backend
             var filePath = GetJsonFromFile();
             if (string.IsNullOrEmpty(filePath))
             {
+                Log("Error sending layout: File selection cancelled.");
                 return;
             }
 

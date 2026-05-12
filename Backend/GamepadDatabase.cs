@@ -125,5 +125,38 @@ namespace Backend
 
             return command.ExecuteNonQuery() > 0;
         }
+
+        public static List<GamepadSummary> GetGamepadsWithControllerMapping()
+        {
+            var gamepads = new List<GamepadSummary>();
+
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            var command = connection.CreateCommand();
+            command.CommandText = @"
+                SELECT id, name, description, orientation, version, created_at, updated_at
+                FROM gamepads
+                WHERE json_extract(json_data, '$.controllerMapping.enabled') = 1
+                ORDER BY updated_at DESC;
+            ";
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                gamepads.Add(new GamepadSummary
+                {
+                    Id = reader.GetString(0),
+                    Name = reader.GetString(1),
+                    Description = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    Orientation = reader.IsDBNull(3) ? "landscape" : reader.GetString(3),
+                    Version = reader.IsDBNull(4) ? 1 : reader.GetInt32(4),
+                    CreatedAt = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    UpdatedAt = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                });
+            }
+
+            return gamepads;
+        }
     }
 }

@@ -37,7 +37,7 @@ export const emptyLayout: GamepadLayout = {
         type: "pause",
         id: "pause_button",
         position: { x: 0.5, y: 0.048 },
-        size: { width: 0.1, height: 0.1 },
+        size: { width: 0.15, height: 0.15 },
         shape: "circle",
         style: {
           backgroundColor: "#6750A4",
@@ -48,7 +48,7 @@ export const emptyLayout: GamepadLayout = {
         type: "screenshot",
         id: "screenshot_button",
         position: { x: 0.024, y: 0.048 },
-        size: { width: 0.1, height: 0.1 },
+        size: { width: 0.15, height: 0.15 },
         shape: "circle",
         style: {
           backgroundColor: "#FF9800",
@@ -59,7 +59,7 @@ export const emptyLayout: GamepadLayout = {
         type: "toggle_system_bar",
         id: "toggle_system_bar",
         position: { x: 0.112, y: 0.048 },
-        size: { width: 0.1, height: 0.1 },
+        size: { width: 0.15, height: 0.15 },
         shape: "circle",
         style: {
           backgroundColor: "#2196F3",

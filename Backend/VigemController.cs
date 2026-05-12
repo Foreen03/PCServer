@@ -42,22 +42,26 @@ namespace Backend
             _window?.SendWebMessage(JsonConvert.SerializeObject(new { type = "log", message }));
         }
 
-        private void LoadControllerMapping()
+        private void LoadControllerMapping(string json)
         {
-            var json = GetJsonFromFile();
             if (string.IsNullOrEmpty(json))
             {
-                Log("No controller mapping file selected. Controller mapping will be disabled.");
+                Log("No controller mapping provided. Controller mapping will be disabled.");
                 return;
             }
-            Log($"Loaded controller mapping: {json}");
+            Log($"Loaded controller mapping from database.");
             controllerMapping = JsonConvert.DeserializeObject<ControllerMapping>(json);
         }
 
         public void Activate()
         {
+            Activate("");
+        }
+
+        public void Activate(string controllerMappingJson)
+        {
             Log("Vigem Controller Activated");
-            LoadControllerMapping();
+            LoadControllerMapping(controllerMappingJson);
             try
             {
                 vigemClient = new ViGEmClient();
@@ -579,39 +583,6 @@ namespace Backend
                     break;
             }
         }
-
-        private string GetJsonFromFile()
-        {
-            var filePath = string.Empty;
-
-            Thread thread = new Thread(() =>
-            {
-                using (OpenFileDialog openFileDialog = new OpenFileDialog())
-                {
-                    openFileDialog.InitialDirectory = "c:";
-                    openFileDialog.Filter = "json files (*.json)|*.json|All files (*.*)|*.*";
-                    openFileDialog.FilterIndex = 1;
-                    openFileDialog.RestoreDirectory = true;
-
-                    if (openFileDialog.ShowDialog() == DialogResult.OK)
-                    {
-                        filePath = openFileDialog.FileName;
-                    }
-                }
-            });
-
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return string.Empty;
-            }
-
-            return File.ReadAllText(filePath);
-        }
-
 
     }
 }

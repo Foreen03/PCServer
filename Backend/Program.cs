@@ -82,12 +82,14 @@ namespace Backend
                         if (mode == "vigem")
                         {
                             _activeController = _vigemController;
+                            var mappingJson = json["controllerMappingJson"]?.ToString() ?? "";
+                            _vigemController.Activate(mappingJson);
                         }
                         else
                         {
                             _activeController = _customPluginController;
+                            _activeController.Activate();
                         }
-                        _activeController.Activate();
                         photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "status", activeMode = mode }));
                         break;
 
@@ -203,6 +205,18 @@ namespace Backend
                         catch (Exception ex)
                         {
                             photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "dbDeleteResult", status = "error", error = ex.Message }));
+                        }
+                        break;
+
+                    case "getVigemGamepads":
+                        try
+                        {
+                            var vigemGamepads = GamepadDatabase.GetGamepadsWithControllerMapping();
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "vigemGamepadList", gamepads = vigemGamepads }));
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "vigemGamepadList", gamepads = new object[0], error = ex.Message }));
                         }
                         break;
                 }

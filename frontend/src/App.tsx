@@ -227,6 +227,19 @@ export default function Page() {
     reject: (error: string) => void;
   } | null>(null);
 
+  // Vigem gamepad selection state
+  const [vigemGamepads, setVigemGamepads] = useState<Array<{
+    Id: string;
+    Name: string;
+    Description: string;
+    Orientation: string;
+    Version: number;
+    CreatedAt: string;
+    UpdatedAt: string;
+  }>>([]);
+  const [loadingVigemGamepads, setLoadingVigemGamepads] = useState(false);
+  const vigemGamepadCallbackRef = useRef<((layout: string) => void) | null>(null);
+
   // Track dirty state: any dispatch after SET_FULL_STATE marks dirty
   const lastSavedStateRef = useRef<string>("");
 
@@ -395,6 +408,17 @@ export default function Page() {
               break;
             case "data":
               break;
+            case "vigemGamepadList":
+              setVigemGamepads(data.gamepads || []);
+              setLoadingVigemGamepads(false);
+              break;
+            case "dbGamepadData":
+              // If there's a pending vigem callback, handle it
+              if (vigemGamepadCallbackRef.current && data.layout) {
+                vigemGamepadCallbackRef.current(data.layout);
+                vigemGamepadCallbackRef.current = null;
+              }
+              break;
           }
         } catch (error) {
           setLogs((prevLogs) =>
@@ -422,8 +446,8 @@ export default function Page() {
     sendMessage({ action: "stopServer" });
     setGpxStarted(false);
   };
-  const handleActivateMode = (mode: "vigem" | "custom") =>
-    sendMessage({ action: "activateMode", mode });
+  const handleActivateMode = (mode: "vigem" | "custom", controllerMappingJson?: string) =>
+    sendMessage({ action: "activateMode", mode, controllerMappingJson: controllerMappingJson ?? "" });
   const handleDeactivateMode = () => {
     sendMessage({ action: "deactivateMode" });
   };
@@ -487,6 +511,19 @@ export default function Page() {
         onExportGpx={handleExportGpx}
         onStartGpx={handleStartGpx}
         isGpxStarted={isGpxStarted}
+        sendMessage={sendMessage}
+        vigemGamepads={vigemGamepads}
+        loadingVigemGamepads={loadingVigemGamepads}
+        onRequestVigemGamepads={() => {
+          setLoadingVigemGamepads(true);
+          sendMessage({ action: "getVigemGamepads" });
+        }}
+        onFetchGamepadForVigem={(gamepadId: string) => {
+          return new Promise<string>((resolve) => {
+            vigemGamepadCallbackRef.current = resolve;
+            sendMessage({ action: "getGamepad", id: gamepadId });
+          });
+        }}
       />
     );
   }
