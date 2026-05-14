@@ -332,19 +332,19 @@ export const CanvasButton = React.memo(function CanvasButton({
     [
       {
         corner: "top-left",
-        style: { top: -10, left: -10, cursor: "nwse-resize" },
+        style: { top: -6, left: -6, cursor: "nwse-resize" },
       },
       {
         corner: "top-right",
-        style: { top: -10, right: -10, cursor: "nesw-resize" },
+        style: { top: -6, right: -6, cursor: "nesw-resize" },
       },
       {
         corner: "bottom-left",
-        style: { bottom: -10, left: -10, cursor: "nesw-resize" },
+        style: { bottom: -6, left: -6, cursor: "nesw-resize" },
       },
       {
         corner: "bottom-right",
-        style: { bottom: -10, right: -10, cursor: "nwse-resize" },
+        style: { bottom: -6, right: -6, cursor: "nwse-resize" },
       },
     ];
 
@@ -367,13 +367,10 @@ export const CanvasButton = React.memo(function CanvasButton({
         ...bgStyle,
         color: resolvedTextColor,
         fontSize,
-        boxShadow: isSelected
-          ? "0 0 0 3px hsl(258 55% 58% / 0.8), 0 4px 16px rgba(0,0,0,0.4)"
-          : showBackground
-            ? "0 2px 8px rgba(0,0,0,0.25)"
-            : "none",
-        outline: isSelected ? "2px solid rgba(255,255,255,0.3)" : "none",
-        outlineOffset: "4px",
+        boxShadow: showBackground
+          ? "0 2px 8px rgba(0,0,0,0.25)"
+          : "none",
+        outline: "none",
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -424,11 +421,11 @@ export const CanvasButton = React.memo(function CanvasButton({
         <div
           className="pointer-events-none absolute"
           style={{
-            top: -OFFSET,
-            left: -OFFSET,
-            right: -OFFSET,
-            bottom: -OFFSET,
-            border: "2px dashed rgba(255,255,255,0.6)",
+            top: -1,
+            left: -1,
+            right: -1,
+            bottom: -1,
+            border: "2px dashed rgba(255,255,255,0.8)",
           }}
         />
       )}
