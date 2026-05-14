@@ -1,6 +1,7 @@
 using Photino.NET;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,10 @@ namespace Backend
 {
     class Program
     {
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern void SetCurrentProcessExplicitAppUserModelID(
+            [MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
         private static IController? _activeController;
         private static GattManager _gattManager = new GattManager();
         private static CustomPluginController _customPluginController = new CustomPluginController(_gattManager);
@@ -20,10 +25,14 @@ namespace Backend
         [STAThread]
         static void Main(string[] args)
         {
+            SetCurrentProcessExplicitAppUserModelID("YHY.BlueStepConnect.PCReceiver");
+            string iconPath = Path.Combine(AppContext.BaseDirectory, "connection.ico");
+
             _window = new PhotinoWindow()
                 .SetTitle("BlueStep Connect PC Receiver")
                 .SetUseOsDefaultSize(false)
                 .SetSize(1024, 768)
+                .SetIconFile(iconPath)
                 .Center();
 
             GamepadDatabase.Initialize();
