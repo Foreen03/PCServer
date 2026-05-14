@@ -397,7 +397,9 @@ export const CanvasButton = React.memo(function CanvasButton({
               objectFit:
                 component.content.image.scaleType === "fit"
                   ? "contain"
-                  : "cover",
+                  : component.content.image.scaleType === "crop"
+                    ? "cover"
+                    : "fill",
             }}
             draggable={false}
           />

@@ -179,7 +179,7 @@ export function PhoneCanvas({
   const { safeArea } = state.layout
   const bgImg = state.theme.backgroundImage
   const bgSizeMap: Record<string, string> = {
-    fill: "cover",
+    fill: "100% 100%",
     fit: "contain",
     crop: "cover",
   }
