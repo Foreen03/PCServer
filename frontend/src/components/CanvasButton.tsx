@@ -54,9 +54,6 @@ export const CanvasButton = React.memo(function CanvasButton({
   const startNorm = useRef({ x: 0, y: 0 });
   const frame = useRef<number | null>(null);
 
-  const HANDLE_SIZE = 12;
-  const OFFSET = HANDLE_SIZE / 2; // 6
-
   // Start geometry for resize is stored in a ref
   const startGeom = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
