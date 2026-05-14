@@ -38,6 +38,8 @@ interface PhoneCanvasProps {
   onSelect: (id: string | null) => void
   dispatch: React.Dispatch<EditorAction>
   device: PhoneDevice
+  snapToGrid?: boolean
+  gridSize?: number
 }
 
 export function PhoneCanvas({
@@ -46,6 +48,8 @@ export function PhoneCanvas({
   onSelect,
   dispatch,
   device,
+  snapToGrid = false,
+  gridSize = 20,
 }: PhoneCanvasProps) {
   const screenRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -268,6 +272,18 @@ export function PhoneCanvas({
             }}
             onClick={handleCanvasClick}
           >
+            {/* Snap-to-grid overlay */}
+            {snapToGrid && (
+              <div
+                className="absolute inset-0 pointer-events-none z-[2]"
+                style={{
+                  backgroundImage:
+                    `linear-gradient(rgba(139,92,246,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.12) 1px, transparent 1px)`,
+                  backgroundSize: `${gridSize}px ${gridSize}px`,
+                  backgroundPosition: '0 0',
+                }}
+              />
+            )}
             {/* Notch / Dynamic Island (iPhone) */}
             {device.id.startsWith("iphone") && device.bezelRadius > 10 && (
               <div
@@ -308,6 +324,8 @@ export function PhoneCanvas({
                 onSelect={onSelect}
                 onPositionChange={handleSystemComponentPositionChange}
                 onSizeAndPositionChange={handleSystemComponentSizeAndPositionChange}
+                snapToGrid={snapToGrid}
+                gridSize={gridSize}
               />
             ))}
 
@@ -337,6 +355,8 @@ export function PhoneCanvas({
                 onSelect={onSelect}
                 onPositionChange={handlePositionChange}
                 onSizeAndPositionChange={handleSizeAndPositionChange}
+                snapToGrid={snapToGrid}
+                gridSize={gridSize}
               />
             ))}
           </div>

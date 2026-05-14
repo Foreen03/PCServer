@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Upload, Download, Smartphone, Monitor, ArrowLeft, Save } from "lucide-react";
+import { Upload, Download, Smartphone, Monitor, ArrowLeft, Save, Grid3X3 } from "lucide-react";
 import type { GamepadLayout, EditorAction } from "@/lib/types";
 import {
   ResizablePanelGroup,
@@ -53,6 +53,8 @@ export function GamepadEditor({
   const [selectedDevice, setSelectedDevice] = useState<PhoneDevice>(
     PHONE_DEVICES[0],
   );
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [gridSize, setGridSize] = useState(20); // dp units
   const promiseRef = useRef<{
     resolve: () => void;
     reject: (error: string) => void;
@@ -313,6 +315,50 @@ export function GamepadEditor({
 
             <div className="h-4 w-px bg-border" />
 
+            {/* Snap to Grid */}
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={snapToGrid ? "secondary" : "ghost"}
+                    size="sm"
+                    className={`h-8 gap-1.5 text-xs ${
+                      snapToGrid
+                        ? "text-primary border border-primary/30"
+                        : "text-muted-foreground"
+                    }`}
+                    onClick={() => setSnapToGrid((v) => !v)}
+                  >
+                    <Grid3X3 className="h-3.5 w-3.5" />
+                    Grid
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {snapToGrid ? "Disable snap to grid" : "Enable snap to grid"}
+                </TooltipContent>
+              </Tooltip>
+              {snapToGrid && (
+                <Select
+                  value={String(gridSize)}
+                  onValueChange={(v) => setGridSize(Number(v))}
+                >
+                  <SelectTrigger className="h-8 w-20 text-xs bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5" className="text-xs">5 dp</SelectItem>
+                    <SelectItem value="10" className="text-xs">10 dp</SelectItem>
+                    <SelectItem value="15" className="text-xs">15 dp</SelectItem>
+                    <SelectItem value="20" className="text-xs">20 dp</SelectItem>
+                    <SelectItem value="25" className="text-xs">25 dp</SelectItem>
+                    <SelectItem value="50" className="text-xs">50 dp</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div className="h-4 w-px bg-border" />
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -404,6 +450,8 @@ export function GamepadEditor({
               onSelect={onSelect}
               dispatch={dispatch}
               device={selectedDevice}
+              snapToGrid={snapToGrid}
+              gridSize={gridSize}
             />
           </ResizablePanel>
           <ResizableHandle withHandle />

@@ -30,6 +30,8 @@ interface CanvasButtonProps {
     newPosition: { x: number; y: number },
     newSize: { width: number; height: number },
   ) => void;
+  snapToGrid?: boolean;
+  gridSize?: number;
 }
 
 export const CanvasButton = React.memo(function CanvasButton({
@@ -43,6 +45,8 @@ export const CanvasButton = React.memo(function CanvasButton({
   onSelect,
   onPositionChange,
   onSizeAndPositionChange,
+  snapToGrid = false,
+  gridSize = 20,
 }: CanvasButtonProps) {
   const isDragging = useRef(false);
   const isResizing = useRef<ResizeCorner | false>(false);
@@ -69,6 +73,14 @@ export const CanvasButton = React.memo(function CanvasButton({
   // Convert device pixels to normalized safe-area position
   const devicePxToNormX = (px: number) => (px - safeLeftPx) / safeW;
   const devicePxToNormY = (py: number) => (py - safeTopPx) / safeH;
+
+  // ─── Snap helpers ──────────────────────────────────────────────────────────
+  const snapPx = (valuePx: number) => {
+    if (!snapToGrid) return valuePx;
+    return Math.round(valuePx / gridSize) * gridSize;
+  };
+
+
 
   // Unified local state for smooth drag and resize
   const [localGeom, setLocalGeom] = useState({
@@ -133,8 +145,20 @@ export const CanvasButton = React.memo(function CanvasButton({
         if (isDragging.current) {
           const deltaX = (e.clientX - startPos.current.x) / screenSafeW;
           const deltaY = (e.clientY - startPos.current.y) / screenSafeH;
-          const newX = Math.max(0, Math.min(1, startNorm.current.x + deltaX));
-          const newY = Math.max(0, Math.min(1, startNorm.current.y + deltaY));
+          let newX = Math.max(0, Math.min(1, startNorm.current.x + deltaX));
+          let newY = Math.max(0, Math.min(1, startNorm.current.y + deltaY));
+          
+          if (snapToGrid) {
+            const pxW = localGeom.w * deviceWidth;
+            const pxH = localGeom.h * deviceHeight;
+            const rawLeftPx = normToDevicePxX(newX) - pxW / 2;
+            const rawTopPx = normToDevicePxY(newY) - pxH / 2;
+            const snappedLeftPx = snapPx(rawLeftPx);
+            const snappedTopPx = snapPx(rawTopPx);
+            newX = devicePxToNormX(snappedLeftPx + pxW / 2);
+            newY = devicePxToNormY(snappedTopPx + pxH / 2);
+          }
+
           setLocalGeom((g) => ({ ...g, x: newX, y: newY }));
           return;
         }
@@ -172,30 +196,57 @@ export const CanvasButton = React.memo(function CanvasButton({
         let newTop = fixedTop;
         let newBottom = fixedBottom;
 
-        if (corner.includes("right"))
+        if (corner.includes("right")) {
           newRight = Math.max(fixedLeft + minPx, curPxX);
-        else if (corner.includes("left"))
+        } else if (corner.includes("left")) {
           newLeft = Math.min(fixedRight - minPx, curPxX);
+        }
 
-        if (corner.includes("bottom"))
+        if (corner.includes("bottom")) {
           newBottom = Math.max(fixedTop + minPx, curPxY);
-        else if (corner.includes("top"))
+        } else if (corner.includes("top")) {
           newTop = Math.min(fixedBottom - minPx, curPxY);
+        }
 
         let newPxW = newRight - newLeft;
         let newPxH = newBottom - newTop;
-        let newCX = newLeft + newPxW / 2;
-        let newCY = newTop + newPxH / 2;
+
+        if (snapToGrid) {
+            newPxW = Math.max(gridSize, Math.round(newPxW / gridSize) * gridSize);
+            newPxH = Math.max(gridSize, Math.round(newPxH / gridSize) * gridSize);
+            
+            // Adjust the moving edge based on the snapped size
+            if (corner.includes("right")) newRight = fixedLeft + newPxW;
+            else if (corner.includes("left")) newLeft = fixedRight - newPxW;
+
+            if (corner.includes("bottom")) newBottom = fixedTop + newPxH;
+            else if (corner.includes("top")) newTop = fixedBottom - newPxH;
+        }
+
+        // Enforce minimum sizes
+        if (newPxW < minPx) {
+            newPxW = snapToGrid ? Math.max(snapPx(minPx), gridSize) : minPx;
+            if (corner.includes("right")) newRight = fixedLeft + newPxW;
+            else if (corner.includes("left")) newLeft = fixedRight - newPxW;
+        }
+        if (newPxH < minPx) {
+            newPxH = snapToGrid ? Math.max(snapPx(minPx), gridSize) : minPx;
+            if (corner.includes("bottom")) newBottom = fixedTop + newPxH;
+            else if (corner.includes("top")) newTop = fixedBottom - newPxH;
+        }
 
         if (component.shape === "circle") {
           const d = Math.min(newPxW, newPxH);
-          if (corner.includes("right")) newCX = fixedLeft + d / 2;
-          else if (corner.includes("left")) newCX = fixedRight - d / 2;
-          if (corner.includes("bottom")) newCY = fixedTop + d / 2;
-          else if (corner.includes("top")) newCY = fixedBottom - d / 2;
+          if (corner.includes("right")) newRight = fixedLeft + d;
+          else if (corner.includes("left")) newLeft = fixedRight - d;
+          if (corner.includes("bottom")) newBottom = fixedTop + d;
+          else if (corner.includes("top")) newTop = fixedBottom - d;
           newPxW = d;
           newPxH = d;
         }
+
+        let newCX = newLeft + newPxW / 2;
+        let newCY = newTop + newPxH / 2;
 
         setLocalGeom({
           x: devicePxToNormX(newCX),
@@ -205,8 +256,7 @@ export const CanvasButton = React.memo(function CanvasButton({
         });
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canvasRect, component.shape, deviceWidth, deviceHeight, safeArea],
+    [canvasRect, component.shape, deviceWidth, deviceHeight, safeArea, snapToGrid, gridSize, localGeom],
   );
 
   const handlePointerUp = useCallback(

@@ -2,7 +2,7 @@ import type { GamepadLayout } from "./types"
 
 // Empty layout for "New Layout"
 export const emptyLayout: GamepadLayout = {
-  version: 2,
+  version: 1,
   gamepad: {
     id: crypto.randomUUID?.() || `layout_${Date.now()}`,
     name: "New Layout",
