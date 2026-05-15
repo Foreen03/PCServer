@@ -384,7 +384,7 @@ export function PhoneCanvas({
                   <ContextMenuItem 
                     onClick={() => handleDeleteComponent(sc.id, true)}
                     disabled={sc.id === "pause_button"}
-                    className="text-destructive"
+                    className="text-destructive focus:bg-red-200"
                   >
                     Delete
                   </ContextMenuItem>
@@ -427,7 +427,7 @@ export function PhoneCanvas({
                   <ContextMenuItem onSelect={() => { onSelect(comp.id); setTimeout(() => setQuickEditId(comp.id), 50); }}>Edit Properties</ContextMenuItem>
                   <ContextMenuItem onClick={() => handleDuplicateComponent(comp)}>Duplicate</ContextMenuItem>
                   <ContextMenuSeparator />
-                  <ContextMenuItem onClick={() => handleDeleteComponent(comp.id, false)} className="text-destructive">Delete</ContextMenuItem>
+                  <ContextMenuItem onClick={() => handleDeleteComponent(comp.id, false)} className="text-destructive focus:text-destructive">Delete</ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
             ))}
