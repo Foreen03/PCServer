@@ -22,8 +22,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { PhoneCanvas, PHONE_DEVICES } from "./PhoneCanvas";
-import type { PhoneDevice } from "./PhoneCanvas";
+import { PhoneCanvas } from "./PhoneCanvas";
+import { type PhoneDevice, PHONE_DEVICES } from "@/lib/devices";
 import { PropertiesPanel } from "./PropertiesPanel";
 // import { useToast } from "@/hooks/use-toast";
 import { toast } from "sonner";

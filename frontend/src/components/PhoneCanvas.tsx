@@ -1,34 +1,26 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { GamepadLayout, EditorAction } from "@/lib/types"
+import type { GamepadLayout, EditorAction, GamepadComponent, SystemComponentType } from "@/lib/types"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from "@/components/ui/context-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { PropertiesPanel } from "./PropertiesPanel"
 import { CanvasButton } from "./CanvasButton"
-
-export interface PhoneDevice {
-  id: string
-  name: string
-  /** Logical width in dp/pt (portrait) */
-  width: number
-  /** Logical height in dp/pt (portrait) */
-  height: number
-  /** Corner radius of the screen bezel */
-  bezelRadius: number
-}
-
-export const PHONE_DEVICES: PhoneDevice[] = [
-  { id: "iphone-15", name: "iPhone 15", width: 393, height: 852, bezelRadius: 48 },
-  { id: "iphone-15-pro-max", name: "iPhone 15 Pro Max", width: 430, height: 932, bezelRadius: 52 },
-  { id: "iphone-se", name: "iPhone SE", width: 375, height: 667, bezelRadius: 0 },
-  { id: "pixel-8", name: "Pixel 8", width: 412, height: 892, bezelRadius: 44 },
-  { id: "pixel-8-pro", name: "Pixel 8 Pro", width: 448, height: 998, bezelRadius: 44 },
-  { id: "samsung-s24", name: "Samsung Galaxy S24", width: 412, height: 915, bezelRadius: 40 },
-  { id: "samsung-s24-ultra", name: "Samsung Galaxy S24 Ultra", width: 412, height: 915, bezelRadius: 12 },
-  { id: "oneplus-12", name: "OnePlus 12", width: 412, height: 919, bezelRadius: 44 },
-  { id: "ipad-mini", name: "iPad Mini", width: 744, height: 1133, bezelRadius: 20 },
-  { id: "ipad-pro-11", name: "iPad Pro 11\"", width: 834, height: 1194, bezelRadius: 20 },
-  { id: "samsung-tab-s9", name: "Samsung Galaxy Tab S9", width: 800, height: 1280, bezelRadius: 16 },
-  { id: "custom-16-9", name: "Generic 16:9", width: 412, height: 732, bezelRadius: 32 },
-]
+import type { PhoneDevice } from "@/lib/devices"
 
 // ─── Phone Canvas ───────────────────────────────────────────────────────────
 
@@ -55,6 +47,7 @@ export function PhoneCanvas({
   const containerRef = useRef<HTMLDivElement>(null)
   const [screenRect, setScreenRect] = useState<DOMRect | null>(null)
   const [scale, setScale] = useState(0.6)
+  const [quickEditId, setQuickEditId] = useState<string | null>(null)
 
   const isLandscape = state.gamepad.orientation === "landscape"
 
@@ -176,6 +169,60 @@ export function PhoneCanvas({
     [onSelect]
   )
 
+  const handleAddComponent = useCallback(() => {
+    const newId = `btn_${Date.now()}`;
+    const newComponent: GamepadComponent = {
+      type: "button",
+      id: newId,
+      position: { x: 0.5, y: 0.5 },
+      size: { width: 0.15, height: 0.15 },
+      shape: "circle",
+      command: "new_command",
+      content: { type: "text", text: "New" },
+    };
+    dispatch({ type: "ADD_COMPONENT", payload: newComponent });
+    onSelect(newId);
+  }, [dispatch, onSelect]);
+
+  const handleAddSystemComponent = useCallback((type: SystemComponentType) => {
+    const newId = `${type}_${Date.now()}`;
+    dispatch({
+      type: "ADD_SYSTEM_COMPONENT",
+      payload: {
+        type: type,
+        id: newId,
+        position: { x: 0.5, y: 0.05 },
+        size: { width: 0.1, height: 0.1 },
+        shape: "circle",
+        style: { backgroundColor: "#6750A4", textColor: "#FFFFFF" },
+      },
+    });
+    onSelect(newId);
+  }, [dispatch, onSelect]);
+
+  const handleDeleteComponent = useCallback((id: string, isSystem: boolean) => {
+    if (isSystem) {
+      dispatch({ type: "DELETE_SYSTEM_COMPONENT", payload: id });
+    } else {
+      dispatch({ type: "DELETE_COMPONENT", payload: id });
+    }
+    if (selectedId === id) onSelect(null);
+  }, [dispatch, selectedId, onSelect]);
+
+  const handleDuplicateComponent = useCallback((comp: GamepadComponent) => {
+    const newId = `btn_${Date.now()}`;
+    const newComponent: GamepadComponent = {
+      ...comp,
+      id: newId,
+      position: {
+        x: Math.min(comp.position.x + 0.05, 0.95),
+        y: Math.min(comp.position.y + 0.05, 0.95),
+      }
+    };
+    dispatch({ type: "ADD_COMPONENT", payload: newComponent });
+    onSelect(newId);
+  }, [dispatch, onSelect]);
+
   const { safeArea } = state.layout
   const bgImg = state.theme.backgroundImage
   const bgSizeMap: Record<string, string> = {
@@ -254,9 +301,11 @@ export function PhoneCanvas({
           )}
 
           {/* Screen */}
-          <div
-            ref={screenRef}
-            className="absolute overflow-hidden"
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div
+                ref={screenRef}
+                className="absolute overflow-hidden"
             style={{
               top: bezel,
               left: bezel,
@@ -312,21 +361,35 @@ export function PhoneCanvas({
 
             {/* System components */}
             {systemComponents.map((sc) => (
-              <CanvasButton
-                key={sc.id}
-                component={sc}
-                buttonTheme={state.theme.button}
-                isSelected={selectedId === sc.id}
-                canvasRect={screenRect}
-                deviceWidth={deviceW}
-                deviceHeight={deviceH}
-                safeArea={safeArea}
-                onSelect={onSelect}
-                onPositionChange={handleSystemComponentPositionChange}
-                onSizeAndPositionChange={handleSystemComponentSizeAndPositionChange}
-                snapToGrid={snapToGrid}
-                gridSize={gridSize}
-              />
+              <ContextMenu key={sc.id}>
+                <ContextMenuTrigger asChild>
+                  <CanvasButton
+                    component={sc}
+                    buttonTheme={state.theme.button}
+                    isSelected={selectedId === sc.id}
+                    canvasRect={screenRect}
+                    deviceWidth={deviceW}
+                    deviceHeight={deviceH}
+                    safeArea={safeArea}
+                    onSelect={onSelect}
+                    onPositionChange={handleSystemComponentPositionChange}
+                    onSizeAndPositionChange={handleSystemComponentSizeAndPositionChange}
+                    snapToGrid={snapToGrid}
+                    gridSize={gridSize}
+                  />
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => { onSelect(sc.id); setTimeout(() => setQuickEditId(sc.id), 50); }}>Edit Properties</ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem 
+                    onClick={() => handleDeleteComponent(sc.id, true)}
+                    disabled={sc.id === "pause_button"}
+                    className="text-destructive"
+                  >
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
 
             {/* Safe area guide */}
@@ -343,23 +406,44 @@ export function PhoneCanvas({
 
             {/* Gamepad components */}
             {state.layout.components.map((comp) => (
-              <CanvasButton
-                key={comp.id}
-                component={comp}
-                buttonTheme={state.theme.button}
-                isSelected={selectedId === comp.id}
-                canvasRect={screenRect}
-                deviceWidth={deviceW}
-                deviceHeight={deviceH}
-                safeArea={safeArea}
-                onSelect={onSelect}
-                onPositionChange={handlePositionChange}
-                onSizeAndPositionChange={handleSizeAndPositionChange}
-                snapToGrid={snapToGrid}
-                gridSize={gridSize}
-              />
+              <ContextMenu key={comp.id}>
+                <ContextMenuTrigger asChild>
+                  <CanvasButton
+                    component={comp}
+                    buttonTheme={state.theme.button}
+                    isSelected={selectedId === comp.id}
+                    canvasRect={screenRect}
+                    deviceWidth={deviceW}
+                    deviceHeight={deviceH}
+                    safeArea={safeArea}
+                    onSelect={onSelect}
+                    onPositionChange={handlePositionChange}
+                    onSizeAndPositionChange={handleSizeAndPositionChange}
+                    snapToGrid={snapToGrid}
+                    gridSize={gridSize}
+                  />
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => { onSelect(comp.id); setTimeout(() => setQuickEditId(comp.id), 50); }}>Edit Properties</ContextMenuItem>
+                  <ContextMenuItem onClick={() => handleDuplicateComponent(comp)}>Duplicate</ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => handleDeleteComponent(comp.id, false)} className="text-destructive">Delete</ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
           </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handleAddComponent}>Add Button</ContextMenuItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Add System Component</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuItem onClick={() => handleAddSystemComponent("screenshot")}>Screenshot</ContextMenuItem>
+              <ContextMenuItem onClick={() => handleAddSystemComponent("toggle_system_bar")}>Toggle System Bar</ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </ContextMenuContent>
+      </ContextMenu>
         </div>
       </div>
 
@@ -372,6 +456,26 @@ export function PhoneCanvas({
         {isLandscape ? " landscape" : " portrait"}
         &middot; {Math.round(scale * 100)}%
       </div>
+
+      <Dialog open={quickEditId !== null} onOpenChange={(open) => !open && setQuickEditId(null)}>
+        <DialogContent 
+          className="max-w-lg w-[90vw] p-0 overflow-hidden bg-card text-card-foreground"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="px-4 py-3 border-b border-border bg-muted/50">
+            <DialogTitle className="text-sm font-semibold">Quick Edit</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto">
+            <PropertiesPanel 
+              state={state} 
+              selectedId={quickEditId} 
+              onSelect={onSelect} 
+              dispatch={dispatch} 
+              mode="component-only" 
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

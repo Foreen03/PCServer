@@ -34,7 +34,7 @@ interface CanvasButtonProps {
   gridSize?: number;
 }
 
-export const CanvasButton = React.memo(function CanvasButton({
+export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasButtonProps & Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect">>(function CanvasButton({
   component,
   buttonTheme,
   isSelected,
@@ -47,7 +47,8 @@ export const CanvasButton = React.memo(function CanvasButton({
   onSizeAndPositionChange,
   snapToGrid = false,
   gridSize = 20,
-}: CanvasButtonProps) {
+  ...props
+}: CanvasButtonProps & Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect">, ref) {
   const isDragging = useRef(false);
   const isResizing = useRef<ResizeCorner | false>(false);
   const startPos = useRef({ x: 0, y: 0 });
@@ -352,9 +353,12 @@ export const CanvasButton = React.memo(function CanvasButton({
 
   return (
     <div
+      {...props}
+      ref={ref}
       className={cn(
         "absolute flex items-center justify-center cursor-grab select-none touch-none",
         isSelected && "z-10",
+        props.className
       )}
       style={{
         width: pxW,
@@ -368,12 +372,26 @@ export const CanvasButton = React.memo(function CanvasButton({
           ? "0 2px 8px rgba(0,0,0,0.25)"
           : "none",
         outline: "none",
+        ...props.style
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      onPointerDown={(e) => {
+        props.onPointerDown?.(e);
+        handlePointerDown(e);
+      }}
+      onPointerMove={(e) => {
+        props.onPointerMove?.(e);
+        handlePointerMove(e);
+      }}
+      onPointerUp={(e) => {
+        props.onPointerUp?.(e);
+        handlePointerUp(e);
+      }}
+      onContextMenu={(e) => {
+        e.stopPropagation();
+        props.onContextMenu?.(e);
+      }}
       role="button"
-      tabIndex={0}
+      tabIndex={props.tabIndex ?? 0}
       aria-label={`${displayLabel} button`}
     >
       {/* Render content based on type */}
@@ -450,4 +468,4 @@ export const CanvasButton = React.memo(function CanvasButton({
         ))}
     </div>
   );
-});
+}));

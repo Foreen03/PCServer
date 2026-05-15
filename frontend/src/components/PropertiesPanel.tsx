@@ -138,6 +138,7 @@ interface PropertiesPanelProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   dispatch: React.Dispatch<EditorAction>;
+  mode?: "full" | "component-only";
 }
 
 function Section({
@@ -231,6 +232,7 @@ export function PropertiesPanel({
   selectedId,
   onSelect,
   dispatch,
+  mode = "full",
 }: PropertiesPanelProps) {
   const selectedComponent = selectedId
     ? state.layout.components.find((c) => c.id === selectedId)
@@ -396,7 +398,9 @@ export function PropertiesPanel({
 
       <ScrollArea className="flex-1">
         <div className="pb-6">
-          <Section icon={Gamepad2} title="Gamepad Info">
+          {mode === "full" && (
+            <>
+              <Section icon={Gamepad2} title="Gamepad Info">
             <div className="flex flex-col gap-3 px-4 pb-4">
               <FieldRow label="Name">
                 <Input
@@ -1196,6 +1200,8 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
+          </>
+          )}
           
           {/* Edit selected system component */}
           {selectedId && !selectedComponent && (state.layout.systemComponents || []).find((sc) => sc.id === selectedId) && (() => {
