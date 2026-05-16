@@ -184,17 +184,27 @@ namespace Backend
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
         private void CaptureScreen()
         {
-            if (Screen.PrimaryScreen == null) { Log("Primary screen is null"); return; }
+            IntPtr fgWindow = GetForegroundWindow();
+            var targetScreen = Screen.PrimaryScreen;
+            if (fgWindow != IntPtr.Zero)
+            {
+                targetScreen = Screen.FromHandle(fgWindow) ?? Screen.PrimaryScreen;
+            }
+
+            if (targetScreen == null) { Log("Target screen is null"); return; }
 
             try
             {
                 // 1. Capture screen
-                Rectangle bounds = Screen.PrimaryScreen.Bounds;
+                Rectangle bounds = targetScreen.Bounds;
                 using var bitmap = new Bitmap(bounds.Width, bounds.Height);
                 using (var g = Graphics.FromImage(bitmap))
-                    g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
+                    g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
 
                 string dir = ResolveDirectory(
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "screenshots"));
