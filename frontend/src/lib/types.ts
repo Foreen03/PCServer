@@ -28,7 +28,17 @@ export interface ImageContent {
   }
 }
 
-export type ButtonContent = TextContent | ImageContent
+export interface ImageTextContent {
+  type: "image_text"
+  text: string
+  image: {
+    type: "url" | "base64"
+    value: string
+    scaleType: ScaleType
+  }
+}
+
+export type ButtonContent = TextContent | ImageContent | ImageTextContent
 
 // ─── Per-component style overrides ────────────────────────────────────────────
 
@@ -223,6 +233,17 @@ export function isButtonContent(obj: unknown): obj is ButtonContent {
   }
   if (c.type === "image") {
     const img = (c as ImageContent).image
+    if (typeof img !== "object" || img === null) return false
+    return (
+      (img.type === "url" || img.type === "base64") &&
+      typeof img.value === "string" &&
+      isScaleType(img.scaleType)
+    )
+  }
+  if (c.type === "image_text") {
+    const it = c as ImageTextContent
+    if (typeof it.text !== "string") return false
+    const img = it.image
     if (typeof img !== "object" || img === null) return false
     return (
       (img.type === "url" || img.type === "base64") &&

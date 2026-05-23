@@ -147,8 +147,9 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
           let newY = Math.max(0, Math.min(1, startNorm.current.y + deltaY));
           
           if (snapToGrid) {
-            const pxW = localGeom.w * deviceWidth;
-            const pxH = localGeom.h * deviceHeight;
+            // Both Android GameButton and SystemButton use usableWidth for sizing
+            const pxW = localGeom.w * safeW;
+            const pxH = localGeom.h * safeH;
             const rawLeftPx = normToDevicePxX(newX) - pxW / 2;
             const rawTopPx = normToDevicePxY(newY) - pxH / 2;
             const snappedLeftPx = snapPx(rawLeftPx);
@@ -167,11 +168,12 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
         const corner = isResizing.current;
         const start = startGeom.current;
 
-        // Start center in device pixels (within safe area coordinate system)
+        // Start center in device pixels
         const startCX = normToDevicePxX(start.x);
         const startCY = normToDevicePxY(start.y);
-        const startPxW = start.w * deviceWidth;
-        const startPxH = start.h * deviceHeight;
+        // Android: both GameButton and SystemButton use usableWidth for sizing
+        const startPxW = start.w * safeW;
+        const startPxH = start.h * safeH;
 
         const halfW = startPxW / 2;
         const halfH = startPxH / 2;
@@ -249,8 +251,8 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
         setLocalGeom({
           x: devicePxToNormX(newCX),
           y: devicePxToNormY(newCY),
-          w: newPxW / deviceWidth,
-          h: newPxH / deviceHeight,
+          w: newPxW / safeW,
+          h: newPxH / safeH,
         });
       });
     },
@@ -293,11 +295,11 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
       let w = localGeom.w;
       let h = localGeom.h;
       if (component.shape === "circle") {
-        const pxW = w * deviceWidth;
-        const pxH = h * deviceHeight;
+        const pxW = w * safeW;
+        const pxH = h * safeH;
         const diameterPx = Math.min(pxW, pxH);
-        w = diameterPx / deviceWidth;
-        h = diameterPx / deviceHeight;
+        w = diameterPx / safeW;
+        h = diameterPx / safeH;
       }
 
       startGeom.current = { x: localGeom.x, y: localGeom.y, w, h };
@@ -309,8 +311,9 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
   // ─── Render ──────────────────────────────────────────────────────────────
 
   const isCircle = component.shape === "circle";
-  let pxW = localGeom.w * deviceWidth;
-  let pxH = localGeom.h * deviceHeight;
+  // Android: both GameButton and SystemButton use usableWidth/usableHeight for sizing
+  let pxW = localGeom.w * safeW;
+  let pxH = localGeom.h * safeH;
 
   if (isCircle) {
     const diameter = Math.min(pxW, pxH);
@@ -318,7 +321,7 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
     pxH = diameter;
   }
 
-  // Position mapped to safe area
+  // Position: system components use full screen coords, gamepad uses safe-area
   const leftPx = normToDevicePxX(localGeom.x);
   const topPx = normToDevicePxY(localGeom.y);
   const fontSize = Math.max(8, resolvedTextSizeSp * (deviceHeight / 800));
@@ -422,6 +425,39 @@ export const CanvasButton = React.memo(React.forwardRef<HTMLDivElement, CanvasBu
             draggable={false}
           />
         </div>
+      ) : component.type === "button" && component.content.type === "image_text" ? (
+        /* image_text: image fills background, text overlaid on top */
+        <>
+          {"image" in component.content && component.content.image && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                overflow: "hidden",
+                borderRadius: isCircle ? "50%" : `${rectRadius}px`,
+              }}
+            >
+              <img
+                src={component.content.image.value}
+                alt={displayLabel}
+                className="w-full h-full"
+                style={{
+                  objectFit:
+                    component.content.image.scaleType === "fit"
+                      ? "contain"
+                      : component.content.image.scaleType === "crop"
+                        ? "cover"
+                        : "fill",
+                }}
+                draggable={false}
+              />
+            </div>
+          )}
+          {"text" in component.content && component.content.text && (
+            <span className="pointer-events-none font-semibold text-center leading-tight truncate px-1 relative z-10">
+              {component.content.text}
+            </span>
+          )}
+        </>
       ) : component.type !== "button" ? (() => {
         const Icon = SYSTEM_COMPONENT_ICON[component.type] || Pause;
         const minDim = Math.min(pxW, pxH);
