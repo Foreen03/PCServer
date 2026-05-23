@@ -18,6 +18,7 @@ import {
   Monitor,
   Image,
   Type,
+  Upload,
 } from "lucide-react";
 import type {
   GamepadLayout,
@@ -485,6 +486,35 @@ export function PropertiesPanel({
 
               {state.theme.backgroundImage.enabled && (
                 <>
+                  <FieldRow label="Upload Image">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*";
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const base64 = reader.result as string;
+                            dispatch({
+                              type: "SET_BACKGROUND_IMAGE",
+                              payload: { value: base64 },
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                        };
+                        input.click();
+                      }}
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1" />
+                      Choose File
+                    </Button>
+                  </FieldRow>
                   <FieldRow label="Image URL">
                     <Input
                       value={state.theme.backgroundImage.value}
@@ -1332,6 +1362,43 @@ export function PropertiesPanel({
                   const imgContent = selectedComponent.content;
                   return (
                   <>
+                    <FieldRow label="Upload Image">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*";
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const base64 = reader.result as string;
+                              dispatch({
+                                type: "UPDATE_COMPONENT",
+                                payload: {
+                                  id: selectedComponent.id,
+                                  updates: {
+                                    content: {
+                                      type: "image",
+                                      image: { ...imgContent.image, value: base64 },
+                                    },
+                                  },
+                                },
+                              });
+                            };
+                            reader.readAsDataURL(file);
+                          };
+                          input.click();
+                        }}
+                      >
+                        <Upload className="h-3.5 w-3.5 mr-1" />
+                        Choose File
+                      </Button>
+                    </FieldRow>
                     <FieldRow label="Image URL">
                       <Input value={imgContent.image.value}
                         onChange={(e) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { content: { type: "image", image: { ...imgContent.image, value: e.target.value } } } } })}
