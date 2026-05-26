@@ -31,7 +31,7 @@ namespace Backend
             _window = new PhotinoWindow()
                 .SetTitle("BlueStep Connect PC Receiver")
                 .SetUseOsDefaultSize(false)
-                .SetSize(1024, 800)
+                .SetSize(1280, 800)
                 .SetIconFile(iconPath)
                 .Center();
 
