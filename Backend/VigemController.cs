@@ -184,47 +184,42 @@ namespace Backend
             }
         }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
         private void CaptureScreen()
         {
-            IntPtr fgWindow = GetForegroundWindow();
-            var targetScreen = Screen.PrimaryScreen;
-            if (fgWindow != IntPtr.Zero)
+            // Run capture on a background thread so we don't block BLE processing
+            // and don't change the foreground window state.
+            _ = Task.Run(() =>
             {
-                targetScreen = Screen.FromHandle(fgWindow) ?? Screen.PrimaryScreen;
-            }
+                try
+                {
+                    // Use Windows Graphics Capture API — works with fullscreen DX/GL/VK games
+                    using var bitmap = ScreenCapture.CaptureMonitor();
+                    if (bitmap == null)
+                    {
+                        Log("[Screenshot] Failed to capture screen — no frame returned");
+                        return;
+                    }
 
-            if (targetScreen == null) { Log("Target screen is null"); return; }
+                    string dir = ResolveDirectory(
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "screenshots"));
+                    string filePath = Path.Combine(dir,
+                        $"screenshot_{DateTime.Now:yyyyMMdd_HHmmssfff}.jpg");
 
-            try
-            {
-                // 1. Capture screen
-                Rectangle bounds = targetScreen.Bounds;
-                using var bitmap = new Bitmap(bounds.Width, bounds.Height);
-                using (var g = Graphics.FromImage(bitmap))
-                    g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+                    bitmap.Save(filePath, System.Drawing.Imaging.ImageFormat.Jpeg);
 
-                string dir = ResolveDirectory(
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "screenshots"));
-                string filePath = Path.Combine(dir,
-                    $"screenshot_{DateTime.Now:yyyyMMdd_HHmmssfff}.jpg");
+                    // Write GPS EXIF directly into the saved JPEG
+                    var (lat, lon) = gpxTrail.CurrentPosition;
+                    WriteGpsToImage(filePath, lat, lon);
 
-                bitmap.Save(filePath, ImageFormat.Jpeg);
-
-                // 2. Write GPS EXIF directly into the saved JPEG
-                var (lat, lon) = gpxTrail.CurrentPosition;
-                WriteGpsToImage(filePath, lat, lon);
-
-                // 3. Register waypoint in GPX
-                gpxTrail.AddScreenshot(filePath);
-                Log($"[Screenshot] Saved + GPS tagged → {Path.GetFileName(filePath)}");
-            }
-            catch (Exception ex)
-            {
-                Log($"[Screenshot] Error: {ex.Message}");
-            }
+                    // Register waypoint in GPX
+                    gpxTrail.AddScreenshot(filePath);
+                    Log($"[Screenshot] Saved + GPS tagged → {Path.GetFileName(filePath)}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"[Screenshot] Error: {ex.Message}");
+                }
+            });
         }
 
         private static void WriteGpsToImage(string filePath, double lat, double lon)

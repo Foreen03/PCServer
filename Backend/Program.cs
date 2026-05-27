@@ -16,6 +16,11 @@ namespace Backend
         private static extern void SetCurrentProcessExplicitAppUserModelID(
             [MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
+        // Per-Monitor V2 DPI awareness — ensures correct physical pixel
+        // dimensions from all Win32 APIs (needed for screen capture).
+        [DllImport("Shcore.dll")]
+        private static extern int SetProcessDpiAwareness(int value);
+
         private static IController? _activeController;
         private static GattManager _gattManager = new GattManager();
         private static CustomPluginController _customPluginController = new CustomPluginController(_gattManager);
@@ -25,6 +30,9 @@ namespace Backend
         [STAThread]
         static void Main(string[] args)
         {
+            // 2 = PROCESS_PER_MONITOR_DPI_AWARE — must be called before any window creation
+            try { SetProcessDpiAwareness(2); } catch { /* already set or unsupported */ }
+
             SetCurrentProcessExplicitAppUserModelID("YHY.BlueStepConnect.PCReceiver");
             string iconPath = Path.Combine(AppContext.BaseDirectory, "connection.ico");
 
