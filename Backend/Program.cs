@@ -39,7 +39,7 @@ namespace Backend
             _window = new PhotinoWindow()
                 .SetTitle("BlueStep Connect PC Receiver")
                 .SetUseOsDefaultSize(false)
-                .SetSize(1280, 800)
+                .SetSize(1280, 960)
                 .SetIconFile(iconPath)
                 .Center();
 
@@ -236,6 +236,26 @@ namespace Backend
                             photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "vigemGamepadList", gamepads = new object[0], error = ex.Message }));
                         }
                         break;
+
+                    case "openScreenshotFolder":
+                        {
+                            string screenshotDir = ResolveExistingDirectory(
+                                Path.Combine(AppContext.BaseDirectory, "screenshots"),
+                                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "screenshots"));
+                            Directory.CreateDirectory(screenshotDir);
+                            System.Diagnostics.Process.Start("explorer.exe", screenshotDir);
+                        }
+                        break;
+
+                    case "openGpxFolder":
+                        {
+                            string gpxDir = ResolveExistingDirectory(
+                                Path.Combine(AppContext.BaseDirectory, "gpx"),
+                                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PCServer", "gpx"));
+                            Directory.CreateDirectory(gpxDir);
+                            System.Diagnostics.Process.Start("explorer.exe", gpxDir);
+                        }
+                        break;
                 }
             });
 
@@ -289,6 +309,24 @@ namespace Backend
             thread.Join();
 
             return filePath;
+        }
+
+        /// <summary>
+        /// Returns the primary directory if it exists and is writable, otherwise the fallback.
+        /// </summary>
+        private static string ResolveExistingDirectory(string primary, string fallback)
+        {
+            try
+            {
+                if (Directory.Exists(primary))
+                    return primary;
+                Directory.CreateDirectory(primary);
+                return primary;
+            }
+            catch
+            {
+                return fallback;
+            }
         }
     }
 }

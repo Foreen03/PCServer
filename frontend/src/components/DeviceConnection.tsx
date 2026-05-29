@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Cast, Gamepad2, Loader2 } from "lucide-react";
+import { ArrowLeft, Cast, FolderOpen, Gamepad2, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Dialog,
@@ -77,6 +77,7 @@ export function DeviceConnection({
   onExportGpx,
   onStartGpx,
   isGpxStarted,
+  sendMessage,
   vigemGamepads,
   loadingVigemGamepads,
   onRequestVigemGamepads,
@@ -268,38 +269,52 @@ export function DeviceConnection({
             </div>
 
             {/* GPX Section */}
-            {gattStatus === "started" && connected && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-foreground">Gpx Trail</h4>
-                <div className="p-4 border rounded-lg bg-card">
-                  <div id="gpx" className="flex flex-wrap gap-2">
-                    <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" disabled={isGpxStarted}>Start GPX Trail</Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Select starting point</DialogTitle>
-                        </DialogHeader>
-                        <MapSelector
-                          onLocationSelect={(lat, lng) => {
-                            onStartGpx(lat, lng);
-                            setMapOpen(false);
-                          }}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      onClick={() => onExportGpx()}
-                      variant="outline"
-                      disabled={!isGpxStarted}
-                    >
-                      Export Gpx
-                    </Button>
-                  </div>
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground">Gpx Trail</h4>
+              <div className="p-4 border rounded-lg bg-card">
+                <div id="gpx" className="flex flex-wrap gap-2">
+                  <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" disabled={isGpxStarted || gattStatus !== "started" || !connected}>Start GPX Trail</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Select starting point</DialogTitle>
+                      </DialogHeader>
+                      <MapSelector
+                        onLocationSelect={(lat, lng) => {
+                          onStartGpx(lat, lng);
+                          setMapOpen(false);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    onClick={() => onExportGpx()}
+                    variant="outline"
+                    disabled={!isGpxStarted || gattStatus !== "started" || !connected}
+                  >
+                    Export Gpx
+                  </Button>
+                  <Button
+                    onClick={() => sendMessage({ action: "openScreenshotFolder" })}
+                    variant="outline"
+                    size="default"
+                  >
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    Screenshots
+                  </Button>
+                  <Button
+                    onClick={() => sendMessage({ action: "openGpxFolder" })}
+                    variant="outline"
+                    size="default"
+                  >
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    GPX Files
+                  </Button>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Logs Section */}
             <div className="space-y-3">
