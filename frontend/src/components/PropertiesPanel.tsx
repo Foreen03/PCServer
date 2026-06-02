@@ -1444,6 +1444,44 @@ export function PropertiesPanel({
                     className="h-8 text-xs" min={8} max={72} />
                 </FieldRow>
 
+                {state.controllerMapping?.enabled && (
+                  <>
+                    <Separator className="my-1" />
+                    <Label className="text-xs text-foreground font-medium">Controller Mapping</Label>
+                    <FieldRow label="Mapped Button">
+                      <Select
+                        value={
+                          state.controllerMapping?.buttonMap?.[selectedComponent.command] ||
+                          "NONE"
+                        }
+                        onValueChange={(v) => {
+                          const newButtonMap = {
+                            ...(state.controllerMapping?.buttonMap || {}),
+                          };
+                          if (v === "NONE") {
+                            delete newButtonMap[selectedComponent.command];
+                          } else {
+                            newButtonMap[selectedComponent.command] = v;
+                          }
+                          handleMappingUpdate({ buttonMap: newButtonMap });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Not Mapped" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">Not Mapped</SelectItem>
+                          {XBOX_BUTTONS.map((btn) => (
+                            <SelectItem key={btn} value={btn}>
+                              {btn}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FieldRow>
+                  </>
+                )}
+
                 <Separator className="my-1" />
                 <Label className="text-xs text-foreground font-medium">Position</Label>
                 <FieldRow label="X">
