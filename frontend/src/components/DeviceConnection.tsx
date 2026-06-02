@@ -373,7 +373,7 @@ export function DeviceConnection({
                 <div ref={logEndRef} />
               </ScrollArea>
             </div>
-            <p className="text-xs text-muted-foreground text-center pt-4">
+            <p className="text-xs text-muted-foreground text-center pt-4 mb-4">
               Ensure your mobile device is discoverable and in range.
             </p>
           </div>

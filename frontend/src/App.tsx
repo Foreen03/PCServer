@@ -241,6 +241,21 @@ export default function Page() {
   const [loadingVigemGamepads, setLoadingVigemGamepads] = useState(false);
   const vigemGamepadCallbackRef = useRef<((layout: string) => void) | null>(null);
 
+  // Library state (centralized to avoid multiple receiveMessage registrations)
+  const [libraryGamepads, setLibraryGamepads] = useState<Array<{
+    Id: string;
+    Name: string;
+    Description: string;
+    Orientation: string;
+    Version: number;
+    CreatedAt: string;
+    UpdatedAt: string;
+  }>>([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const libraryGamepadCallbackRef = useRef<((layout: string) => void) | null>(null);
+  const libraryDeleteCallbackRef = useRef<(() => void) | null>(null);
+
   // Track dirty state: any dispatch after SET_FULL_STATE marks dirty
   const lastSavedStateRef = useRef<string>("");
 
@@ -417,11 +432,29 @@ export default function Page() {
               setLoadingVigemGamepads(false);
               break;
             case "dbGamepadData":
-              // If there's a pending vigem callback, handle it
+              // Vigem flow takes priority
               if (vigemGamepadCallbackRef.current && data.layout) {
                 vigemGamepadCallbackRef.current(data.layout);
                 vigemGamepadCallbackRef.current = null;
+              } else if (libraryGamepadCallbackRef.current) {
+                libraryGamepadCallbackRef.current(data.layout ?? null);
+                libraryGamepadCallbackRef.current = null;
               }
+              break;
+            case "dbGamepadList":
+              setLibraryGamepads(data.gamepads || []);
+              setLibraryLoading(false);
+              if (data.error) {
+                setLibraryError(data.error);
+              }
+              break;
+            case "dbDeleteResult":
+              if (data.status === "success") {
+                libraryDeleteCallbackRef.current?.();
+              } else if (data.error) {
+                setLibraryError(data.error);
+              }
+              libraryDeleteCallbackRef.current = null;
               break;
           }
         } catch (error) {
@@ -480,98 +513,145 @@ export default function Page() {
     setGpxStarted(true);
   };
 
-  if (view === "menu") {
-    return (
-      <MainMenu
-        onNewLayout={handleNewLayout}
-        onOpenLibrary={handleOpenLibrary}
-        onConnect={handleConnect}
-      />
-    );
-  }
+  const renderView = () => {
+    if (view === "menu") {
+      return (
+        <MainMenu
+          onNewLayout={handleNewLayout}
+          onOpenLibrary={handleOpenLibrary}
+          onConnect={handleConnect}
+        />
+      );
+    }
 
-  if (view === "library") {
-    return (
-      <GamepadLibrary
-        onBackToMenu={handleBackToMenu}
-        onOpenLayout={handleOpenLayout}
-      />
-    );
-  }
+    if (view === "library") {
+      return (
+        <GamepadLibrary
+          onBackToMenu={handleBackToMenu}
+          onOpenLayout={handleOpenLayout}
+          gamepads={libraryGamepads}
+          loading={libraryLoading}
+          error={libraryError}
+          setError={setLibraryError}
+          onLoadGamepads={() => {
+            setLibraryLoading(true);
+            sendMessage({ action: "getAllGamepads" });
+          }}
+          onFetchGamepad={(id: string) => {
+            return new Promise<string>((resolve, reject) => {
+              libraryGamepadCallbackRef.current = (layout) => {
+                if (layout) resolve(layout);
+                else reject("Gamepad not found");
+              };
+              sendMessage({ action: "getGamepad", id });
+            });
+          }}
+          onDeleteGamepad={(id: string) => {
+            return new Promise<void>((resolve) => {
+              libraryDeleteCallbackRef.current = resolve;
+              sendMessage({ action: "deleteGamepad", id });
+            });
+          }}
+        />
+      );
+    }
 
-  if (view === "device-connection") {
+    if (view === "device-connection") {
+      return (
+        <DeviceConnection
+          onBackToMenu={handleBackToMenu}
+          gattStatus={gattStatus}
+          activeMode={activeMode}
+          logs={logs}
+          connected={connected}
+          onStartServer={handleStartServer}
+          onStopServer={handleStopServer}
+          onActivateMode={handleActivateMode}
+          onDeactivateMode={handleDeactivateMode}
+          onSendLayout={handleSendLayout}
+          onExportGpx={handleExportGpx}
+          onStartGpx={handleStartGpx}
+          isGpxStarted={isGpxStarted}
+          sendMessage={sendMessage}
+          vigemGamepads={vigemGamepads}
+          loadingVigemGamepads={loadingVigemGamepads}
+          onRequestVigemGamepads={() => {
+            setLoadingVigemGamepads(true);
+            sendMessage({ action: "getVigemGamepads" });
+          }}
+          onFetchGamepadForVigem={(gamepadId: string) => {
+            return new Promise<string>((resolve) => {
+              vigemGamepadCallbackRef.current = resolve;
+              sendMessage({ action: "getGamepad", id: gamepadId });
+            });
+          }}
+        />
+      );
+    }
+
     return (
-      <DeviceConnection
-        onBackToMenu={handleBackToMenu}
-        gattStatus={gattStatus}
-        activeMode={activeMode}
-        logs={logs}
-        connected={connected}
-        onStartServer={handleStartServer}
-        onStopServer={handleStopServer}
-        onActivateMode={handleActivateMode}
-        onDeactivateMode={handleDeactivateMode}
-        onSendLayout={handleSendLayout}
-        onExportGpx={handleExportGpx}
-        onStartGpx={handleStartGpx}
-        isGpxStarted={isGpxStarted}
-        sendMessage={sendMessage}
-        vigemGamepads={vigemGamepads}
-        loadingVigemGamepads={loadingVigemGamepads}
-        onRequestVigemGamepads={() => {
-          setLoadingVigemGamepads(true);
-          sendMessage({ action: "getVigemGamepads" });
-        }}
-        onFetchGamepadForVigem={(gamepadId: string) => {
-          return new Promise<string>((resolve) => {
-            vigemGamepadCallbackRef.current = resolve;
-            sendMessage({ action: "getGamepad", id: gamepadId });
-          });
-        }}
-      />
+      <>
+        <GamepadEditor
+          state={state}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          dispatch={dispatch}
+          onBackToMenu={handleBackToMenu}
+          connected={connected}
+          onSaveToDb={() => handleSaveToDb()}
+          isDirty={isDirty}
+        />
+
+        {/* Unsaved Changes Dialog */}
+        <AlertDialog
+          open={showUnsavedDialog}
+          onOpenChange={(open) => {
+            if (!open) handleUnsavedDialogCancel();
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Would you like to save before leaving?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleUnsavedDialogCancel}>
+                Cancel
+              </AlertDialogCancel>
+              <Button variant="outline" onClick={handleUnsavedDialogExit}>
+                Exit without saving
+              </Button>
+              <AlertDialogAction onClick={handleUnsavedDialogSaveAndExit}>
+                Save and Exit
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
-  }
+  };
 
   return (
     <>
-      <GamepadEditor
-        state={state}
-        selectedId={selectedId}
-        onSelect={handleSelect}
-        dispatch={dispatch}
-        onBackToMenu={handleBackToMenu}
-        connected={connected}
-        onSaveToDb={() => handleSaveToDb()}
-        isDirty={isDirty}
-      />
+      {renderView()}
 
-      {/* Unsaved Changes Dialog */}
-      <AlertDialog
-        open={showUnsavedDialog}
-        onOpenChange={(open) => {
-          if (!open) handleUnsavedDialogCancel();
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes. Would you like to save before leaving?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleUnsavedDialogCancel}>
-              Cancel
-            </AlertDialogCancel>
-            <Button variant="outline" onClick={handleUnsavedDialogExit}>
-              Exit without saving
-            </Button>
-            <AlertDialogAction onClick={handleUnsavedDialogSaveAndExit}>
-              Save and Exit
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Persistent GPX Recording Indicator - visible across all views */}
+      {isGpxStarted && (
+        <div
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-600/90 text-white text-xs font-medium shadow-lg backdrop-blur-sm cursor-pointer hover:bg-red-600 transition-colors"
+          onClick={handleConnect}
+          title="Click to go to PC Receiver"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+          </span>
+          GPX Recording
+        </div>
+      )}
     </>
   );
 }
+

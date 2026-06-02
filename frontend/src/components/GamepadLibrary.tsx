@@ -55,93 +55,61 @@ interface GamepadSummary {
 interface GamepadLibraryProps {
   onBackToMenu: () => void;
   onOpenLayout: (layout: GamepadLayout) => void;
+  gamepads: GamepadSummary[];
+  loading: boolean;
+  error: string | null;
+  setError: (error: string | null) => void;
+  onLoadGamepads: () => void;
+  onFetchGamepad: (id: string) => Promise<string>;
+  onDeleteGamepad: (id: string) => Promise<void>;
 }
 
 export function GamepadLibrary({
   onBackToMenu,
   onOpenLayout,
+  gamepads,
+  loading,
+  error,
+  setError,
+  onLoadGamepads,
+  onFetchGamepad,
+  onDeleteGamepad,
 }: GamepadLibraryProps) {
-  const [gamepads, setGamepads] = useState<GamepadSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GamepadSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pendingActionRef = useRef<string | null>(null);
-
-  const sendMessage = (payload: object) => {
-    if (window.external && window.external.sendMessage) {
-      window.external.sendMessage(JSON.stringify(payload));
-    }
-  };
-
-  const loadGamepads = () => {
-    setLoading(true);
-    pendingActionRef.current = "list";
-    sendMessage({ action: "getAllGamepads" });
-  };
 
   useEffect(() => {
-    if (window.external && window.external.receiveMessage) {
-      window.external.receiveMessage((message: string) => {
-        try {
-          const data = JSON.parse(message);
-
-          if (data.type === "dbGamepadList") {
-            setGamepads(data.gamepads || []);
-            setLoading(false);
-            if (data.error) {
-              setError(data.error);
-            }
-          }
-
-          if (data.type === "dbGamepadData") {
-            if (data.layout) {
-              try {
-                const parsed = JSON.parse(data.layout);
-                const validation = validateGamepadLayout(parsed);
-                if (validation.valid) {
-                  onOpenLayout(parsed as GamepadLayout);
-                } else {
-                  setError(
-                    validation.error || "Invalid layout data in database"
-                  );
-                }
-              } catch {
-                setError("Failed to parse saved layout data");
-              }
-            } else if (data.error) {
-              setError(data.error);
-            }
-          }
-
-          if (data.type === "dbDeleteResult") {
-            if (data.status === "success") {
-              loadGamepads();
-            } else if (data.error) {
-              setError(data.error);
-            }
-          }
-        } catch {
-          // Ignore non-JSON messages
-        }
-      });
-    }
-
-    loadGamepads();
+    onLoadGamepads();
   }, []);
 
-  const handleOpen = (id: string) => {
+  const handleOpen = async (id: string) => {
     setError(null);
-    sendMessage({ action: "getGamepad", id });
+    try {
+      const layoutJson = await onFetchGamepad(id);
+      const parsed = JSON.parse(layoutJson);
+      const validation = validateGamepadLayout(parsed);
+      if (validation.valid) {
+        onOpenLayout(parsed as GamepadLayout);
+      } else {
+        setError(validation.error || "Invalid layout data in database");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const handleDelete = (gamepad: GamepadSummary) => {
     setDeleteTarget(gamepad);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteTarget) {
-      sendMessage({ action: "deleteGamepad", id: deleteTarget.Id });
+      try {
+        await onDeleteGamepad(deleteTarget.Id);
+        onLoadGamepads();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
       setDeleteTarget(null);
     }
   };

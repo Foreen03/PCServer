@@ -35,11 +35,10 @@ export function MainMenu({
             <Gamepad2 className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Gamepad Layout Editor
+            BlueStep
           </h1>
           <p className="text-muted-foreground max-w-md">
-            Create and customize mobile game controller layouts for your Jetpack
-            Compose applications
+            Connect your mobile device as a gamepad and create custom layouts
           </p>
         </div>
 

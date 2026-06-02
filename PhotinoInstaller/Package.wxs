@@ -2,9 +2,9 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product
     Id="*"
-    Name="PCServer_YHY"
+    Name="BlueStep"
     Language="1033"
-    Version="1.2.1"
+    Version="1.2.3"
     Manufacturer="YHY"
     UpgradeCode="A3F2C1D4-8B7E-4F92-9A3B-6C5D2E1F0A8B">
 
@@ -19,7 +19,7 @@
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <UIRef Id="WixUI_InstallDir" />
 
-    <Feature Id="MainFeature" Title="PCServer_YHY" Level="1">
+    <Feature Id="MainFeature" Title="BlueStep" Level="1">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="ApplicationShortcut" />
       <ComponentRef Id="DesktopShortcut" />
@@ -30,7 +30,7 @@
         <Directory Id="INSTALLFOLDER" Name="PCServer_YHY" />
       </Directory>
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="PCServer_YHY" />
+        <Directory Id="ApplicationProgramsFolder" Name="BlueStep" />
       </Directory>
       <Directory Id="DesktopFolder" Name="Desktop" />
     </Directory>
@@ -38,25 +38,25 @@
     <DirectoryRef Id="ApplicationProgramsFolder">
       <Component Id="ApplicationShortcut" Guid="12345678-1234-1234-1234-1234567890AB">
         <Shortcut Id="ApplicationStartMenuShortcut"
-          Name="PCServer_YHY"
-          Description="PCServer_YHY"
+          Name="BlueStep"
+          Description="BlueStep"
           Target="[INSTALLFOLDER]Backend.exe"
           WorkingDirectory="INSTALLFOLDER"
           Icon="AppIcon.ico" />
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
-        <RegistryValue Root="HKCU" Key="Software\YHY\PCServer_YHY" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\YHY\BlueStep" Name="installed" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
     <DirectoryRef Id="DesktopFolder">
     <Component Id="DesktopShortcut" Guid="A1B2C3D4-1234-5678-ABCD-1234567890CD">
       <Shortcut Id="DesktopShortcutLink"
-        Name="PCServer_YHY"
-        Description="PCServer_YHY"
+        Name="BlueStep"
+        Description="BlueStep"
         Target="[INSTALLFOLDER]Backend.exe"
         WorkingDirectory="INSTALLFOLDER"
         Icon="AppIcon.ico" />
       <RemoveFolder Id="DesktopFolderRemove" Directory="DesktopFolder" On="uninstall" />
-      <RegistryValue Root="HKCU" Key="Software\YHY\PCServer_YHY" Name="desktopshortcut" Type="integer" Value="1" KeyPath="yes" />
+      <RegistryValue Root="HKCU" Key="Software\YHY\BlueStep" Name="desktopshortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
   </DirectoryRef>
 
