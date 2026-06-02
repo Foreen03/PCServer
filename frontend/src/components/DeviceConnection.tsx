@@ -9,15 +9,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Cast, FolderOpen, Gamepad2, Loader2 } from "lucide-react";
+import { ArrowLeft, Cast, FolderOpen, Gamepad2, Loader2, MapPin, X } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import MapSelector from "./MapSelector";
 import L from "leaflet";
@@ -63,6 +63,23 @@ interface DeviceConnectionProps {
   onFetchGamepadForVigem: (gamepadId: string) => Promise<string>;
 }
 
+const GPX_START_POINT_KEY = "gpx-start-point";
+
+function loadSavedStartPoint(): { lat: number; lng: number } | null {
+  try {
+    const saved = localStorage.getItem(GPX_START_POINT_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export function DeviceConnection({
   onBackToMenu,
   gattStatus,
@@ -87,10 +104,27 @@ export function DeviceConnection({
   const [isMapOpen, setMapOpen] = useState(false);
   const [isVigemDialogOpen, setVigemDialogOpen] = useState(false);
   const [loadingGamepadId, setLoadingGamepadId] = useState<string | null>(null);
+  const [gpxStartPoint, setGpxStartPoint] = useState<{ lat: number; lng: number } | null>(loadSavedStartPoint);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
+
+  const handleSaveStartPoint = useCallback((lat: number, lng: number) => {
+    const point = { lat, lng };
+    setGpxStartPoint(point);
+    localStorage.setItem(GPX_START_POINT_KEY, JSON.stringify(point));
+    setMapOpen(false);
+    toast.success(`Start point set: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, {
+      position: "top-center",
+    });
+  }, []);
+
+  const handleStartGpxWithSaved = useCallback(() => {
+    if (gpxStartPoint) {
+      onStartGpx(gpxStartPoint.lat, gpxStartPoint.lng);
+    }
+  }, [gpxStartPoint, onStartGpx]);
 
   const handleOpenVigemDialog = useCallback(() => {
     setVigemDialogOpen(true);
@@ -271,24 +305,37 @@ export function DeviceConnection({
             {/* GPX Section */}
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Gpx Trail</h4>
-              <div className="p-4 border rounded-lg bg-card">
+              <div className="p-4 border rounded-lg bg-card space-y-4">
+                {/* Saved start point display */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Start Point:</span>
+                  </div>
+                  {gpxStartPoint ? (
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {gpxStartPoint.lat.toFixed(6)}, {gpxStartPoint.lng.toFixed(6)}
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground/60 italic">Not set</span>
+                  )}
+                </div>
+
                 <div id="gpx" className="flex flex-wrap gap-2">
-                  <Dialog open={isMapOpen} onOpenChange={setMapOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" disabled={isGpxStarted || gattStatus !== "started" || !connected}>Start GPX Trail</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Select starting point</DialogTitle>
-                      </DialogHeader>
-                      <MapSelector
-                        onLocationSelect={(lat, lng) => {
-                          onStartGpx(lat, lng);
-                          setMapOpen(false);
-                        }}
-                      />
-                    </DialogContent>
-                  </Dialog>
+                  <Button
+                    variant="outline"
+                    onClick={() => setMapOpen(true)}
+                  >
+                    <MapPin className="h-4 w-4 mr-1" />
+                    Select Start Point
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={isGpxStarted || gattStatus !== "started" || !connected || !gpxStartPoint}
+                    onClick={handleStartGpxWithSaved}
+                  >
+                    Start GPX Trail
+                  </Button>
                   <Button
                     onClick={() => onExportGpx()}
                     variant="outline"
@@ -331,6 +378,46 @@ export function DeviceConnection({
             </p>
           </div>
         </ScrollArea>
+
+        {/* Full-screen Map Overlay for Start Point Selection */}
+        {isMapOpen && (
+          <div className="fixed inset-0 z-50 bg-background flex flex-col">
+            <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Select Starting Point
+                  </h2>
+                </div>
+                {gpxStartPoint && (
+                  <>
+                    <div className="h-4 w-px bg-border" />
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {gpxStartPoint.lat.toFixed(6)}, {gpxStartPoint.lng.toFixed(6)}
+                    </Badge>
+                  </>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setMapOpen(false)}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close map</span>
+              </Button>
+            </header>
+            <div className="flex-1">
+              <MapSelector
+                onLocationSelect={handleSaveStartPoint}
+                initialPosition={gpxStartPoint}
+                height="100%"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Vigem Gamepad Selection Dialog */}
         <Dialog open={isVigemDialogOpen} onOpenChange={setVigemDialogOpen}>
