@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Text;
 using System.Runtime.InteropServices;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
@@ -53,6 +54,45 @@ namespace Backend
         private const uint MONITOR_DEFAULTTOPRIMARY = 1;
         private const uint MONITOR_DEFAULTTONEAREST = 2;
 
+        // ── P/Invoke for window capture ─────────────────────────────────
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindowW(string? lpClassName, string lpWindowName);
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        private static extern int GetWindowTextLengthW(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PrintWindow(IntPtr hWnd, IntPtr hDC, uint nFlags);
+
+        // PW_RENDERFULLCONTENT (flag 2) — captures DirectComposition / DWM content
+        private const uint PW_RENDERFULLCONTENT = 2;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+            public int Width => Right - Left;
+            public int Height => Bottom - Top;
+        }
+
         /// <summary>
         /// Captures the monitor where the foreground window (game) is displayed.
         /// Uses Windows.Graphics.Capture (works with fullscreen games) when
@@ -64,7 +104,13 @@ namespace Backend
             {
                 if (GraphicsCaptureSession.IsSupported())
                 {
-                    return CaptureWithGraphicsCapture();
+                    IntPtr fgWindow = GetForegroundWindow();
+                    IntPtr hMonitor = (fgWindow != IntPtr.Zero)
+                        ? MonitorFromWindow(fgWindow, MONITOR_DEFAULTTONEAREST)
+                        : MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
+                    var captureItem = CreateItemForMonitor(hMonitor);
+                    if (captureItem != null)
+                        return CaptureWithGraphicsCapture(captureItem);
                 }
             }
             catch (Exception ex)
@@ -75,8 +121,78 @@ namespace Backend
             return CaptureWithGdi();
         }
 
-        // ── Windows Graphics Capture path ──────────────────────────────
-        private static Bitmap? CaptureWithGraphicsCapture()
+        /// <summary>
+        /// Captures the foreground window only (no taskbar, no other windows).
+        /// Auto-detects the foreground window via GetForegroundWindow().
+        /// </summary>
+        public static Bitmap? CaptureWindow()
+        {
+            IntPtr hwnd = GetForegroundWindow();
+            if (hwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("[ScreenCapture] No foreground window found, falling back to monitor capture.");
+                return CaptureMonitor();
+            }
+            return CaptureWindow(hwnd);
+        }
+
+        /// <summary>
+        /// Captures a specific window by its handle (no taskbar, no other windows).
+        /// </summary>
+        public static Bitmap? CaptureWindow(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero)
+                return CaptureMonitor();
+
+            try
+            {
+                if (GraphicsCaptureSession.IsSupported())
+                {
+                    var captureItem = CreateItemForWindow(hwnd);
+                    if (captureItem != null)
+                        return CaptureWithGraphicsCapture(captureItem);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ScreenCapture] Window Graphics Capture failed, falling back to GDI: {ex.Message}");
+            }
+
+            return CaptureWindowWithGdi(hwnd);
+        }
+
+        /// <summary>
+        /// Finds a visible window whose title contains the given search text
+        /// (case-insensitive partial match). Returns IntPtr.Zero if not found.
+        /// </summary>
+        public static IntPtr FindWindowByTitle(string titlePart)
+        {
+            IntPtr found = IntPtr.Zero;
+
+            EnumWindows((hWnd, _) =>
+            {
+                if (!IsWindowVisible(hWnd)) return true; // skip hidden windows
+
+                int length = GetWindowTextLengthW(hWnd);
+                if (length == 0) return true;
+
+                var sb = new StringBuilder(length + 1);
+                GetWindowTextW(hWnd, sb, sb.Capacity);
+                string title = sb.ToString();
+
+                if (title.IndexOf(titlePart, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    found = hWnd;
+                    return false; // stop enumeration
+                }
+                return true; // continue
+            }, IntPtr.Zero);
+
+            return found;
+        }
+
+        // ── Windows Graphics Capture path (shared by monitor + window) ──
+        private static Bitmap? CaptureWithGraphicsCapture(GraphicsCaptureItem captureItem)
         {
             IntPtr previousDpiContext = IntPtr.Zero;
             try
@@ -88,24 +204,14 @@ namespace Backend
 
             try
             {
-                // 1. Get the monitor where the foreground window (game) is displayed.
-                //    Since CaptureScreen runs on a background thread, the game is
-                //    still the foreground window at this point.
-                IntPtr fgWindow = GetForegroundWindow();
-                IntPtr hMonitor = (fgWindow != IntPtr.Zero)
-                    ? MonitorFromWindow(fgWindow, MONITOR_DEFAULTTONEAREST)
-                    : MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
-                var captureItem = CreateItemForMonitor(hMonitor);
-                if (captureItem == null) return CaptureWithGdi(); // fallback
-
-                // 2. Create D3D11 device + WinRT wrapper
+                // 1. Create D3D11 device + WinRT wrapper
                 Device d3dDevice = new Device(
                     SharpDX.Direct3D.DriverType.Hardware,
                     DeviceCreationFlags.BgraSupport);
 
                 IDirect3DDevice winrtDevice = CreateDirect3DDeviceFromSharpDX(d3dDevice);
 
-                // 3. Set up frame pool & session
+                // 2. Set up frame pool & session
                 var size = captureItem.Size;
                 var framePool = Direct3D11CaptureFramePool.CreateFreeThreaded(
                     winrtDevice,
@@ -148,7 +254,7 @@ namespace Backend
                 framePool.Dispose();
                 d3dDevice.Dispose();
 
-                return result ?? CaptureWithGdi(); // fallback if no frame arrived
+                return result;
             }
             finally
             {
@@ -167,6 +273,15 @@ namespace Backend
             var interopFactory = GraphicsCaptureItem.As<IGraphicsCaptureItemInterop>();
             Guid itemGuid = typeof(GraphicsCaptureItem).GUID;
             interopFactory.CreateForMonitor(hMonitor, itemGuid, out var rawItem);
+            return rawItem as GraphicsCaptureItem;
+        }
+
+        private static GraphicsCaptureItem? CreateItemForWindow(IntPtr hwnd)
+        {
+            // Use the interop factory to create a GraphicsCaptureItem from a window handle
+            var interopFactory = GraphicsCaptureItem.As<IGraphicsCaptureItemInterop>();
+            Guid itemGuid = typeof(GraphicsCaptureItem).GUID;
+            interopFactory.CreateForWindow(hwnd, ref itemGuid, out var rawItem);
             return rawItem as GraphicsCaptureItem;
         }
 
@@ -270,7 +385,7 @@ namespace Backend
             }
         }
 
-        // ── GDI fallback ───────────────────────────────────────────────
+        // ── GDI fallback (monitor) ──────────────────────────────────────
         private static Bitmap CaptureWithGdi()
         {
             IntPtr fgWindow = GetForegroundWindow();
@@ -282,6 +397,55 @@ namespace Backend
             using (var g = Graphics.FromImage(bitmap))
                 g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
             return bitmap;
+        }
+
+        // ── GDI fallback (window) ──────────────────────────────────────
+        private static Bitmap? CaptureWindowWithGdi(IntPtr hwnd)
+        {
+            if (!GetWindowRect(hwnd, out RECT rect) || rect.Width <= 0 || rect.Height <= 0)
+                return CaptureWithGdi(); // fallback to full monitor
+
+            var bitmap = new Bitmap(rect.Width, rect.Height);
+            using (var g = Graphics.FromImage(bitmap))
+            {
+                IntPtr hdc = g.GetHdc();
+                try
+                {
+                    // PW_RENDERFULLCONTENT captures DWM-composed content
+                    if (!PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT))
+                    {
+                        // Fallback: try without the flag (older Windows)
+                        PrintWindow(hwnd, hdc, 0);
+                    }
+                }
+                finally
+                {
+                    g.ReleaseHdc(hdc);
+                }
+            }
+            return bitmap;
+        }
+
+        // ── Save screenshot to disk ────────────────────────────────────
+        /// <summary>
+        /// Saves the bitmap as a JPEG file (quality 80) to the given directory.
+        /// Returns the full path of the saved file.
+        /// </summary>
+        public static string SaveScreenshot(Bitmap bitmap, string directory)
+        {
+            Directory.CreateDirectory(directory);
+            string fileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss_fff}.jpg";
+            string filePath = Path.Combine(directory, fileName);
+
+            // JPEG encoder with quality 80
+            var jpegEncoder = ImageCodecInfo.GetImageEncoders()
+                .First(e => e.FormatID == ImageFormat.Jpeg.Guid);
+            var encoderParams = new EncoderParameters(1);
+            encoderParams.Param[0] = new EncoderParameter(
+                System.Drawing.Imaging.Encoder.Quality, 80L);
+
+            bitmap.Save(filePath, jpegEncoder, encoderParams);
+            return filePath;
         }
     }
 }

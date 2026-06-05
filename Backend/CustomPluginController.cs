@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using RedCorners.ExifLibrary;
 
 namespace Backend
 {
@@ -25,6 +26,8 @@ namespace Backend
         private int steps;
         private long lastTimestamp;
 
+        private GpxTrail gpxTrail = new GpxTrail();
+
         public void SetWindow(Photino.NET.PhotinoWindow window)
         {
             _window = window;
@@ -39,12 +42,128 @@ namespace Backend
         {
             Log("Custom Plugin Controller Activated");
             WebSocketHost.Start();
+            WebSocketHost.OnMessageReceived += HandleWebSocketMessage;
         }
 
         public void Deactivate()
         {
             Log("Custom Plugin Controller Deactivated");
+            WebSocketHost.OnMessageReceived -= HandleWebSocketMessage;
             WebSocketHost.Stop();
+        }
+
+        private void HandleWebSocketMessage(string rawJson)
+        {
+            try
+            {
+                Packet? p = JsonConvert.DeserializeObject<Packet>(rawJson);
+                if (p == null || p.packetType != "captureScreen") return;
+
+                // Run on a background thread to avoid blocking the WebSocket message loop
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        // Determine capture mode: "monitor" (default) or "window"
+                        string mode = "monitor";
+                        string? windowTitle = null;
+
+                        if (p.payload != null)
+                        {
+                            if (p.payload.TryGetValue("mode", out var modeObj) && modeObj != null)
+                                mode = modeObj.ToString() ?? "monitor";
+
+                            if (p.payload.TryGetValue("title", out var titleObj) && titleObj != null)
+                                windowTitle = titleObj.ToString();
+                        }
+
+                        System.Drawing.Bitmap? screenshot;
+
+                        if (mode == "window")
+                        {
+                            if (!string.IsNullOrEmpty(windowTitle))
+                            {
+                                // Find window by title (partial, case-insensitive match)
+                                IntPtr hwnd = ScreenCapture.FindWindowByTitle(windowTitle);
+                                if (hwnd != IntPtr.Zero)
+                                {
+                                    screenshot = ScreenCapture.CaptureWindow(hwnd);
+                                }
+                                else
+                                {
+                                    Log($"[ScreenCapture] Window '{windowTitle}' not found, falling back to foreground window.");
+                                    screenshot = ScreenCapture.CaptureWindow();
+                                }
+                            }
+                            else
+                            {
+                                // Auto-detect foreground window
+                                screenshot = ScreenCapture.CaptureWindow();
+                            }
+                        }
+                        else
+                        {
+                            // Full monitor capture (default)
+                            screenshot = ScreenCapture.CaptureMonitor();
+                        }
+
+                        if (screenshot != null)
+                        {
+                            // Save to screenshots directory
+                            string screenshotDir = System.IO.Path.Combine(
+                                AppContext.BaseDirectory, "screenshots");
+                            string filePath = ScreenCapture.SaveScreenshot(screenshot, screenshotDir);
+
+                            // Write GPS EXIF directly into the saved JPEG
+                            var (lat, lon) = gpxTrail.CurrentPosition;
+                            WriteGpsToImage(filePath, lat, lon);
+
+                            // Register waypoint in GPX
+                            gpxTrail.AddScreenshot(filePath);
+
+                            // Broadcast a tiny notification (~100 bytes, no image data)
+                            WebSocketHost.Broadcast(new
+                            {
+                                type = "screenshot",
+                                path = filePath,
+                                width = screenshot.Width,
+                                height = screenshot.Height
+                            });
+
+                            screenshot.Dispose();
+                            Log($"[ScreenCapture] Saved: {filePath}");
+                        }
+                        else
+                        {
+                            Log("[ScreenCapture] Capture returned null.");
+                        }
+                    }
+                    catch (Exception captureEx)
+                    {
+                        Log($"[ScreenCapture] Error: {captureEx.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"[ScreenCapture] Error parsing WebSocket message: {ex.Message}");
+            }
+        }
+
+        private static void WriteGpsToImage(string filePath, double lat, double lon)
+        {
+            try
+            {
+                var file = ImageFile.FromFile(filePath);
+                file.SetGPSCoords((float)lat, (float)lon);
+                file.Properties.Set(ExifTag.DateTimeOriginal, DateTime.UtcNow);
+                file.Save(filePath);
+                Console.WriteLine($"[EXIF] GPS written: ({lat:F6}, {lon:F6})");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EXIF] Failed: {ex.Message}");
+            }
         }
 
         public void ProcessData(string data)
@@ -98,6 +217,8 @@ namespace Backend
                             }
                         }
 
+                        gpxTrail.Update(p);
+
                         WebSocketHost.Broadcast(new
                         {
                             type = "movement",
@@ -123,6 +244,8 @@ namespace Backend
                             });
                         }
                         break;
+
+
                 }
             }
             catch (Exception ex)

@@ -14,6 +14,11 @@ namespace Backend
         private static readonly TimeSpan _pongTimeout = TimeSpan.FromSeconds(10);
         private static WebSocketServer? server;
 
+        /// <summary>
+        /// Fired when a text message is received from any connected WebSocket client.
+        /// </summary>
+        public static event Action<string>? OnMessageReceived;
+
         public static void Start(int port = 8765)
         {
             if (server != null) return; // already running
@@ -55,6 +60,9 @@ namespace Backend
                 {
                     if (_clients.ContainsKey(socket))
                         _clients[socket] = DateTime.UtcNow;
+
+                    // Notify subscribers of the incoming message
+                    OnMessageReceived?.Invoke(message);
                 };
 
                 socket.OnPong = _ =>
