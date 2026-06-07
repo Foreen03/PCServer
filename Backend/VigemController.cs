@@ -32,6 +32,12 @@ namespace Backend
 
         private GpxTrail gpxTrail = new GpxTrail();
 
+        // ── Cooldowns: prevent duplicate GPX calls from 60Hz button state ──
+        private DateTime _lastGpxStartTime = DateTime.MinValue;
+        private DateTime _lastGpxExportTime = DateTime.MinValue;
+        private static readonly TimeSpan GpxStartCooldown = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan GpxExportCooldown = TimeSpan.FromSeconds(5);
+
         public void SetWindow(PhotinoWindow window)
         {
             _window = window;
@@ -260,13 +266,29 @@ namespace Backend
 
         public void StartNewTrail(Double startLat, double startLon)
         {
+            // Cooldown: ignore rapid-fire calls from 60Hz button state
+            var now = DateTime.UtcNow;
+            if (now - _lastGpxStartTime < GpxStartCooldown)
+                return;
+            _lastGpxStartTime = now;
+
             gpxTrail = new GpxTrail();
             gpxTrail.SetStartPoint(startLat, startLon);
             gpxTrail.GenerateTrail();
+
+            // Notify the PC frontend UI so the GPX status badge updates
+            _window?.SendWebMessage(JsonConvert.SerializeObject(
+                new { type = "gpxStatus", started = true }));
         }
 
         public void ExportGpx()
         {
+            // Cooldown: ignore rapid-fire calls from 60Hz button state
+            var now = DateTime.UtcNow;
+            if (now - _lastGpxExportTime < GpxExportCooldown)
+                return;
+            _lastGpxExportTime = now;
+
             // gpxTrail.AddMetadata("WalkedDistance", _walkedDistance.ToString());
 
             string gpxPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "gpx");
@@ -290,6 +312,10 @@ namespace Backend
             string fileName = $"gpx_{DateTime.Now:yyyyMMdd_HHmmssfff}.gpx";
             string filePath = Path.Combine(gpxPath, fileName);
             gpxTrail.Export(filePath);
+
+            // Notify the PC frontend UI so the GPX status badge updates
+            _window?.SendWebMessage(JsonConvert.SerializeObject(
+                new { type = "gpxStatus", started = false }));
         }
 
         private void ProcessButtons(Packet p, MappingConfig mapping, IXbox360Controller controller)

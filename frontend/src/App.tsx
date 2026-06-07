@@ -456,6 +456,12 @@ export default function Page() {
               }
               libraryDeleteCallbackRef.current = null;
               break;
+            case "gpxStatus":
+              // Server notifies us when GPX starts/stops (e.g. triggered by game SDK)
+              if (data.started !== undefined) {
+                setGpxStarted(data.started);
+              }
+              break;
           }
         } catch (error) {
           setLogs((prevLogs) =>

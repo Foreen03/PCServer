@@ -28,6 +28,12 @@ namespace Backend
 
         private GpxTrail gpxTrail = new GpxTrail();
 
+        // ── Cooldowns: prevent duplicate GPX calls from 60Hz button state ──
+        private DateTime _lastGpxStartTime = DateTime.MinValue;
+        private DateTime _lastGpxExportTime = DateTime.MinValue;
+        private static readonly TimeSpan GpxStartCooldown = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan GpxExportCooldown = TimeSpan.FromSeconds(5);
+
         public void SetWindow(Photino.NET.PhotinoWindow window)
         {
             _window = window;
@@ -57,97 +63,235 @@ namespace Backend
             try
             {
                 Packet? p = JsonConvert.DeserializeObject<Packet>(rawJson);
-                if (p == null || p.packetType != "captureScreen") return;
+                if (p == null) return;
 
-                // Run on a background thread to avoid blocking the WebSocket message loop
-                Task.Run(() =>
+                switch (p.packetType)
                 {
+                    case "captureScreen":
+                        HandleCaptureScreen(p);
+                        break;
+
+                    case "gpxStart":
+                        HandleGpxStart(p);
+                        break;
+
+                    case "gpxExport":
+                        HandleGpxExport();
+                        break;
+
+                    case "gpxUpdateLocation":
+                        HandleGpxUpdateLocation(p);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[WS] Error parsing WebSocket message: {ex.Message}");
+            }
+        }
+
+        private void HandleGpxStart(Packet p)
+        {
+            // Cooldown: ignore rapid-fire calls from 60Hz button state
+            var now = DateTime.UtcNow;
+            if (now - _lastGpxStartTime < GpxStartCooldown)
+                return;
+            _lastGpxStartTime = now;
+
+            try
+            {
+                gpxTrail = new GpxTrail();
+
+                // Optional start point — use server defaults if not provided
+                if (p.payload != null)
+                {
+                    bool hasLat = p.payload.TryGetValue("lat", out var latObj);
+                    bool hasLon = p.payload.TryGetValue("lon", out var lonObj);
+                    if (hasLat && hasLon)
+                    {
+                        gpxTrail.SetStartPoint(Convert.ToDouble(latObj), Convert.ToDouble(lonObj));
+                    }
+
+                    // Manual-location mode: game will send lat/lon via gpxUpdateLocation
+                    if (p.payload.TryGetValue("manualLocation", out var manualObj) &&
+                        Convert.ToBoolean(manualObj))
+                    {
+                        gpxTrail.InitializeManualTrail();
+                        Log("[GPX] Started in manual-location mode");
+                        WebSocketHost.Broadcast(new { type = "gpxStarted", mode = "manual" });
+
+                        // Notify the PC frontend UI so the GPX status badge updates
+                        _window?.SendWebMessage(Newtonsoft.Json.JsonConvert.SerializeObject(
+                            new { type = "gpxStatus", started = true }));
+                        return;
+                    }
+                }
+
+                // Default: generate a random trail advanced by step cadence
+                gpxTrail.GenerateTrail();
+                Log("[GPX] Started with random trail");
+                WebSocketHost.Broadcast(new { type = "gpxStarted", mode = "random" });
+
+                // Notify the PC frontend UI so the GPX status badge updates
+                _window?.SendWebMessage(Newtonsoft.Json.JsonConvert.SerializeObject(
+                    new { type = "gpxStatus", started = true }));
+            }
+            catch (Exception ex)
+            {
+                Log($"[GPX] Error starting: {ex.Message}");
+                WebSocketHost.Broadcast(new { type = "gpxStarted", error = ex.Message });
+            }
+        }
+
+        private void HandleGpxExport()
+        {
+            // Cooldown: ignore rapid-fire calls from 60Hz button state
+            var now = DateTime.UtcNow;
+            if (now - _lastGpxExportTime < GpxExportCooldown)
+                return;
+            _lastGpxExportTime = now;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    string gpxDir = Path.Combine(AppContext.BaseDirectory, "gpx");
                     try
                     {
-                        // Determine capture mode: "monitor" (default) or "window"
-                        string mode = "monitor";
-                        string? windowTitle = null;
+                        Directory.CreateDirectory(gpxDir);
+                    }
+                    catch
+                    {
+                        gpxDir = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "PCServer", "gpx");
+                        Directory.CreateDirectory(gpxDir);
+                    }
 
-                        if (p.payload != null)
+                    string fileName = $"gpx_{DateTime.Now:yyyyMMdd_HHmmssfff}.gpx";
+                    string filePath = Path.Combine(gpxDir, fileName);
+                    gpxTrail.Export(filePath);
+
+                    var duration = gpxTrail.ExportDuration;
+                    WebSocketHost.Broadcast(new
+                    {
+                        type = "gpxExported",
+                        path = filePath,
+                        distance = gpxTrail.DistanceWalkedKm,
+                        duration = $"{duration:hh\\:mm\\:ss}"
+                    });
+                    Log($"[GPX] Exported → {filePath}");
+
+                    // Notify the PC frontend UI so the GPX status badge updates
+                    _window?.SendWebMessage(Newtonsoft.Json.JsonConvert.SerializeObject(
+                        new { type = "gpxStatus", started = false }));
+                }
+                catch (Exception ex)
+                {
+                    Log($"[GPX] Export error: {ex.Message}");
+                    WebSocketHost.Broadcast(new { type = "gpxExported", error = ex.Message });
+                }
+            });
+        }
+
+        private void HandleGpxUpdateLocation(Packet p)
+        {
+            if (p.payload == null) return;
+            if (!p.payload.TryGetValue("lat", out var latObj) ||
+                !p.payload.TryGetValue("lon", out var lonObj))
+                return;
+
+            double lat = Convert.ToDouble(latObj);
+            double lon = Convert.ToDouble(lonObj);
+            gpxTrail.UpdateWithLocation(lat, lon, p.timeStamp);
+        }
+
+        private void HandleCaptureScreen(Packet p)
+        {
+            // Run on a background thread to avoid blocking the WebSocket message loop
+            Task.Run(() =>
+            {
+                try
+                {
+                    // Determine capture mode: "monitor" (default) or "window"
+                    string mode = "monitor";
+                    string? windowTitle = null;
+
+                    if (p.payload != null)
+                    {
+                        if (p.payload.TryGetValue("mode", out var modeObj) && modeObj != null)
+                            mode = modeObj.ToString() ?? "monitor";
+
+                        if (p.payload.TryGetValue("title", out var titleObj) && titleObj != null)
+                            windowTitle = titleObj.ToString();
+                    }
+
+                    System.Drawing.Bitmap? screenshot;
+
+                    if (mode == "window")
+                    {
+                        if (!string.IsNullOrEmpty(windowTitle))
                         {
-                            if (p.payload.TryGetValue("mode", out var modeObj) && modeObj != null)
-                                mode = modeObj.ToString() ?? "monitor";
-
-                            if (p.payload.TryGetValue("title", out var titleObj) && titleObj != null)
-                                windowTitle = titleObj.ToString();
-                        }
-
-                        System.Drawing.Bitmap? screenshot;
-
-                        if (mode == "window")
-                        {
-                            if (!string.IsNullOrEmpty(windowTitle))
+                            // Find window by title (partial, case-insensitive match)
+                            IntPtr hwnd = ScreenCapture.FindWindowByTitle(windowTitle);
+                            if (hwnd != IntPtr.Zero)
                             {
-                                // Find window by title (partial, case-insensitive match)
-                                IntPtr hwnd = ScreenCapture.FindWindowByTitle(windowTitle);
-                                if (hwnd != IntPtr.Zero)
-                                {
-                                    screenshot = ScreenCapture.CaptureWindow(hwnd);
-                                }
-                                else
-                                {
-                                    Log($"[ScreenCapture] Window '{windowTitle}' not found, falling back to foreground window.");
-                                    screenshot = ScreenCapture.CaptureWindow();
-                                }
+                                screenshot = ScreenCapture.CaptureWindow(hwnd);
                             }
                             else
                             {
-                                // Auto-detect foreground window
+                                Log($"[ScreenCapture] Window '{windowTitle}' not found, falling back to foreground window.");
                                 screenshot = ScreenCapture.CaptureWindow();
                             }
                         }
                         else
                         {
-                            // Full monitor capture (default)
-                            screenshot = ScreenCapture.CaptureMonitor();
-                        }
-
-                        if (screenshot != null)
-                        {
-                            // Save to screenshots directory
-                            string screenshotDir = System.IO.Path.Combine(
-                                AppContext.BaseDirectory, "screenshots");
-                            string filePath = ScreenCapture.SaveScreenshot(screenshot, screenshotDir);
-
-                            // Write GPS EXIF directly into the saved JPEG
-                            var (lat, lon) = gpxTrail.CurrentPosition;
-                            WriteGpsToImage(filePath, lat, lon);
-
-                            // Register waypoint in GPX
-                            gpxTrail.AddScreenshot(filePath);
-
-                            // Broadcast a tiny notification (~100 bytes, no image data)
-                            WebSocketHost.Broadcast(new
-                            {
-                                type = "screenshot",
-                                path = filePath,
-                                width = screenshot.Width,
-                                height = screenshot.Height
-                            });
-
-                            screenshot.Dispose();
-                            Log($"[ScreenCapture] Saved: {filePath}");
-                        }
-                        else
-                        {
-                            Log("[ScreenCapture] Capture returned null.");
+                            // Auto-detect foreground window
+                            screenshot = ScreenCapture.CaptureWindow();
                         }
                     }
-                    catch (Exception captureEx)
+                    else
                     {
-                        Log($"[ScreenCapture] Error: {captureEx.Message}");
+                        // Full monitor capture (default)
+                        screenshot = ScreenCapture.CaptureMonitor();
                     }
-                });
-            }
-            catch (Exception ex)
-            {
-                Log($"[ScreenCapture] Error parsing WebSocket message: {ex.Message}");
-            }
+
+                    if (screenshot != null)
+                    {
+                        // Save to screenshots directory
+                        string screenshotDir = System.IO.Path.Combine(
+                            AppContext.BaseDirectory, "screenshots");
+                        string filePath = ScreenCapture.SaveScreenshot(screenshot, screenshotDir);
+
+                        // Write GPS EXIF directly into the saved JPEG
+                        var (lat, lon) = gpxTrail.CurrentPosition;
+                        WriteGpsToImage(filePath, lat, lon);
+
+                        // Register waypoint in GPX
+                        gpxTrail.AddScreenshot(filePath);
+
+                        // Broadcast a tiny notification (~100 bytes, no image data)
+                        WebSocketHost.Broadcast(new
+                        {
+                            type = "screenshot",
+                            path = filePath,
+                            width = screenshot.Width,
+                            height = screenshot.Height
+                        });
+
+                        screenshot.Dispose();
+                        Log($"[ScreenCapture] Saved: {filePath}");
+                    }
+                    else
+                    {
+                        Log("[ScreenCapture] Capture returned null.");
+                    }
+                }
+                catch (Exception captureEx)
+                {
+                    Log($"[ScreenCapture] Error: {captureEx.Message}");
+                }
+            });
         }
 
         private static void WriteGpsToImage(string filePath, double lat, double lon)

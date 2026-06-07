@@ -37,6 +37,11 @@ namespace Backend
         private long _lastTimestamp = 0;
         private readonly object _lock = new();
 
+        // ── Manual-location mode ───────────────────────────────────────────
+        private bool _isManualMode = false;
+        private long _lastManualUpdateMs = 0;
+        private const long ManualUpdateIntervalMs = 500; // ~2Hz throttle
+
         // Track is a list of (Timestamp, TrailIndex) keyframes for timestamp rewriting.
         public List<(DateTime Time, int TrailIndex)> Track { get; } = new();
         public List<(double Lat, double Lon, string File)> Screenshots { get; } = new();
@@ -168,9 +173,50 @@ namespace Backend
                 _trailIndexAccum = 0.0;
                 _distanceWalkedKm = 0.0;
                 _lastTimestamp = 0;
+                _isManualMode = false;
+                _lastManualUpdateMs = 0;
                 Track.Clear();
                 Screenshots.Clear();
                 Metadata.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Initializes the trail for manual-location mode.
+        /// Instead of generating a random walk, the trail starts with a single
+        /// point at (BaseLat, BaseLon) and grows as the game sends locations
+        /// via UpdateWithLocation().
+        /// </summary>
+        public void InitializeManualTrail()
+        {
+            lock (_lock)
+            {
+                _trail = new List<TrackPoint>
+                {
+                    new TrackPoint
+                    {
+                        Lat = BaseLat,
+                        Lon = BaseLon,
+                        Time = DateTime.UtcNow,
+                        Speed = 0,
+                        Cadence = null,
+                        Heading = null,
+                        Elevation = null
+                    }
+                };
+                _trailIndex = 0;
+                _trailIndexAccum = 0.0;
+                _distanceWalkedKm = 0.0;
+                _lastTimestamp = 0;
+                _isManualMode = true;
+                _lastManualUpdateMs = 0;
+                Track.Clear();
+                Screenshots.Clear();
+                Metadata.Clear();
+
+                Track.Add((DateTime.UtcNow, 0));
+
+                Console.WriteLine($"[Trail] Manual-location mode initialized at {BaseLat:F7}, {BaseLon:F7}");
             }
         }
 
@@ -178,6 +224,14 @@ namespace Backend
         {
             lock (_lock)
             {
+                if (_isManualMode)
+                {
+                    // In manual-location mode, the game provides explicit coordinates
+                    // via UpdateWithLocation(). We do not advance a simulated pointer
+                    // based on steps cadence.
+                    return;
+                }
+
                 if (_trail.Count == 0)
                 {
                     Console.WriteLine("[Trail] Update() called before GenerateTrail() — ignoring.");
@@ -225,6 +279,54 @@ namespace Backend
             }
         }
 
+        /// <summary>
+        /// Adds a new point to the trail from an explicit lat/lon sent by the game.
+        /// Throttled server-side to ~2Hz (500ms interval) to prevent flooding.
+        /// Only works when trail is in manual-location mode (InitializeManualTrail).
+        /// </summary>
+        public void UpdateWithLocation(double lat, double lon, long timestampMs)
+        {
+            lock (_lock)
+            {
+                if (!_isManualMode)
+                {
+                    Console.WriteLine("[Trail] UpdateWithLocation() called but not in manual mode — ignoring.");
+                    return;
+                }
+
+                // Throttle: ignore updates arriving faster than ~2Hz
+                if (_lastManualUpdateMs > 0 && (timestampMs - _lastManualUpdateMs) < ManualUpdateIntervalMs)
+                    return;
+                _lastManualUpdateMs = timestampMs;
+
+                var time = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs).UtcDateTime;
+
+                // Calculate distance from last point
+                var lastPt = _trail[_trailIndex];
+                double stepKm = Haversine(lastPt.Lon, lastPt.Lat, lon, lat);
+                _distanceWalkedKm += stepKm;
+
+                // Calculate speed between this point and the last
+                double dtSeconds = (time - lastPt.Time).TotalSeconds;
+                double speedMs = dtSeconds > 0 ? (stepKm * 1000.0) / dtSeconds : 0;
+
+                var newPt = new TrackPoint
+                {
+                    Lat = lat,
+                    Lon = lon,
+                    Time = time,
+                    Speed = speedMs,
+                    Cadence = null,
+                    Heading = null,
+                    Elevation = null
+                };
+
+                _trail.Add(newPt);
+                _trailIndex = _trail.Count - 1;
+                Track.Add((time, _trailIndex));
+            }
+        }
+
         public void AddScreenshot(string file)
         {
             lock (_lock)
@@ -232,6 +334,22 @@ namespace Backend
                 double lat = _trail.Count > 0 ? _trail[_trailIndex].Lat : BaseLat;
                 double lon = _trail.Count > 0 ? _trail[_trailIndex].Lon : BaseLon;
                 Screenshots.Add((lat, lon, file));
+            }
+        }
+
+        /// <summary>
+        /// Returns the duration of the walked trail for export results.
+        /// </summary>
+        public TimeSpan ExportDuration
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    if (_trail.Count < 2 || _trailIndex < 1)
+                        return TimeSpan.Zero;
+                    return _trail[_trailIndex].Time - _trail[0].Time;
+                }
             }
         }
 
