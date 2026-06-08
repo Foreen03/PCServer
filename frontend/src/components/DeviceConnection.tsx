@@ -243,7 +243,7 @@ export function DeviceConnection({
                     }
                     className="capitalize"
                   >
-                    {isGpxStarted?"Started":"Stopped"}
+                    {isGpxStarted ? "Started" : "Stopped"}
                   </Badge>
                 </div>
               </div>
@@ -331,7 +331,7 @@ export function DeviceConnection({
                   </Button>
                   <Button
                     variant="outline"
-                    disabled={isGpxStarted || gattStatus !== "started" || !connected || !gpxStartPoint}
+                    disabled={isGpxStarted || gattStatus !== "started" || !connected || !gpxStartPoint || activeMode === "custom"}
                     onClick={handleStartGpxWithSaved}
                   >
                     Start GPX Trail

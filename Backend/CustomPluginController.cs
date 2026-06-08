@@ -173,11 +173,14 @@ namespace Backend
                     gpxTrail.Export(filePath);
 
                     var duration = gpxTrail.ExportDuration;
+                    var distance = gpxTrail.DistanceWalkedKm;
+                    gpxTrail.Reset();
+
                     WebSocketHost.Broadcast(new
                     {
                         type = "gpxExported",
                         path = filePath,
-                        distance = gpxTrail.DistanceWalkedKm,
+                        distance = distance,
                         duration = $"{duration:hh\\:mm\\:ss}"
                     });
                     Log($"[GPX] Exported → {filePath}");

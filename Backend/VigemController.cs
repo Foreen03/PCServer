@@ -312,6 +312,7 @@ namespace Backend
             string fileName = $"gpx_{DateTime.Now:yyyyMMdd_HHmmssfff}.gpx";
             string filePath = Path.Combine(gpxPath, fileName);
             gpxTrail.Export(filePath);
+            gpxTrail.Reset();
 
             // Notify the PC frontend UI so the GPX status badge updates
             _window?.SendWebMessage(JsonConvert.SerializeObject(
