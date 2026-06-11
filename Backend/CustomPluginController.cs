@@ -82,6 +82,10 @@ namespace Backend
                     case "gpxUpdateLocation":
                         HandleGpxUpdateLocation(p);
                         break;
+
+                    case "vibrate":
+                        HandleVibrate(p);
+                        break;
                 }
             }
             catch (Exception ex)
@@ -295,6 +299,33 @@ namespace Backend
                     Log($"[ScreenCapture] Error: {captureEx.Message}");
                 }
             });
+        }
+
+        private async void HandleVibrate(Packet p)
+        {
+            try
+            {
+                int duration = 0;
+                if (p.payload != null && p.payload.TryGetValue("duration", out var durationObj))
+                {
+                    duration = Convert.ToInt32(durationObj);
+                }
+
+                var vibratePacket = new
+                {
+                    type = "VIBRATE",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    data = duration
+                };
+
+                string json = JsonConvert.SerializeObject(vibratePacket);
+                await _gattManager.NotifyValueChanged(json);
+                Log($"[Vibrate] Sent vibration packet to phone (duration: {duration}ms).");
+            }
+            catch (Exception ex)
+            {
+                Log($"[Vibrate] Error sending vibration: {ex.Message}");
+            }
         }
 
         private static void WriteGpsToImage(string filePath, double lat, double lon)
