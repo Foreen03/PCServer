@@ -11,6 +11,7 @@ import {
   Smartphone,
   Monitor,
   FolderOpen,
+  HelpCircle,
 } from "lucide-react";
 import {
   Tooltip,
@@ -62,6 +63,7 @@ interface GamepadLibraryProps {
   onLoadGamepads: () => void;
   onFetchGamepad: (id: string) => Promise<string>;
   onDeleteGamepad: (id: string) => Promise<void>;
+  onStartTour?: () => void;
 }
 
 export function GamepadLibrary({
@@ -74,6 +76,7 @@ export function GamepadLibrary({
   onLoadGamepads,
   onFetchGamepad,
   onDeleteGamepad,
+  onStartTour,
 }: GamepadLibraryProps) {
   const [deleteTarget, setDeleteTarget] = useState<GamepadSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,7 +176,7 @@ export function GamepadLibrary({
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col h-screen bg-background">
         {/* Top Toolbar */}
-        <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+        <header id="tour-library-header" className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
           <div className="flex items-center gap-3">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -207,6 +210,7 @@ export function GamepadLibrary({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  id="tour-library-import"
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
@@ -218,6 +222,23 @@ export function GamepadLibrary({
               </TooltipTrigger>
               <TooltipContent>Import JSON</TooltipContent>
             </Tooltip>
+
+            {onStartTour && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={onStartTour}
+                  >
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    <span className="sr-only">Start Tour Guide</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Start Tour Guide</TooltipContent>
+              </Tooltip>
+            )}
           </div>
           <input
             ref={fileInputRef}
@@ -230,7 +251,7 @@ export function GamepadLibrary({
 
         {/* Content */}
         <ScrollArea className="flex-1">
-          <div className="mx-auto max-w-7xl space-y-6 px-4 pt-4 pb-8 w-full">
+          <div id="tour-library-content" className="mx-auto max-w-7xl space-y-6 px-4 pt-4 pb-8 w-full">
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />

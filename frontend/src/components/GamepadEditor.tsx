@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Upload, Download, Smartphone, Monitor, ArrowLeft, Save, Grid3X3 } from "lucide-react";
+import { Upload, Download, Smartphone, Monitor, ArrowLeft, Save, Grid3X3, HelpCircle } from "lucide-react";
 import type { GamepadLayout, EditorAction } from "@/lib/types";
 import {
   ResizablePanelGroup,
@@ -37,6 +37,7 @@ interface GamepadEditorProps {
   connected: boolean;
   onSaveToDb?: () => void;
   isDirty?: boolean;
+  onStartTour?: () => void;
 }
 
 export function GamepadEditor({
@@ -48,6 +49,7 @@ export function GamepadEditor({
   connected,
   onSaveToDb,
   isDirty,
+  onStartTour,
 }: GamepadEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDevice, setSelectedDevice] = useState<PhoneDevice>(
@@ -200,7 +202,7 @@ export function GamepadEditor({
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col h-screen">
         {/* Top Toolbar */}
-        <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+        <header id="tour-editor-header" className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
           <div className="flex items-center gap-3">
             {onBackToMenu && (
               <Tooltip>
@@ -237,7 +239,7 @@ export function GamepadEditor({
               value={selectedDevice.id}
               onValueChange={handleDeviceChange}
             >
-              <SelectTrigger className="h-8 w-56 text-xs bg-background border-border">
+              <SelectTrigger id="tour-editor-device-select" className="h-8 w-56 text-xs bg-background border-border">
                 <SelectValue placeholder="Select device" />
               </SelectTrigger>
               <SelectContent>
@@ -292,6 +294,7 @@ export function GamepadEditor({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  id="tour-editor-orientation"
                   variant="ghost"
                   size="sm"
                   className="h-8 gap-1.5 text-xs text-muted-foreground"
@@ -316,7 +319,7 @@ export function GamepadEditor({
             <div className="h-4 w-px bg-border" />
 
             {/* Snap to Grid */}
-            <div className="flex items-center gap-1">
+            <div id="tour-editor-grid" className="flex items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -362,6 +365,7 @@ export function GamepadEditor({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  id="tour-editor-save"
                   variant={isDirty ? "default" : "ghost"}
                   size="icon"
                   className="h-8 w-8"
@@ -406,6 +410,23 @@ export function GamepadEditor({
               <TooltipContent>Export JSON</TooltipContent>
             </Tooltip>
 
+            {onStartTour && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={onStartTour}
+                  >
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    <span className="sr-only">Start Tour Guide</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Start Tour Guide</TooltipContent>
+              </Tooltip>
+            )}
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="relative">
@@ -443,7 +464,7 @@ export function GamepadEditor({
 
         {/* Main Content */}
         <ResizablePanelGroup direction="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={60} minSize={35}>
+          <ResizablePanel id="tour-editor-canvas" defaultSize={60} minSize={35}>
             <PhoneCanvas
               state={state}
               selectedId={selectedId}
@@ -455,7 +476,7 @@ export function GamepadEditor({
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={40} minSize={25} maxSize={55}>
+          <ResizablePanel id="tour-editor-properties" defaultSize={40} minSize={25} maxSize={55}>
             <PropertiesPanel
               state={state}
               selectedId={selectedId}

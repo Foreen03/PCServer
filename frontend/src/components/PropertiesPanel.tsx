@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { useTour } from "@/components/tour";
+
 import {
   ChevronRight,
   Trash2,
@@ -143,20 +145,31 @@ interface PropertiesPanelProps {
 }
 
 function Section({
+  id,
   icon: Icon,
   title,
   defaultOpen = true,
   children,
 }: {
+  id?: string;
   icon: React.ElementType;
   title: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const tour = useTour();
+
+  const isCurrentStep = tour.isActive && id && tour.steps[tour.currentStep]?.selectorId === id;
+
+  useEffect(() => {
+    if (isCurrentStep) {
+      setOpen(true);
+    }
+  }, [isCurrentStep]);
 
   return (
-    <div>
+    <div id={id}>
       <button
         className="flex w-full items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors"
         onClick={() => setOpen(!open)}
@@ -388,7 +401,7 @@ export function PropertiesPanel({
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-card">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div id="tour-editor-properties-header" className="flex items-center justify-between px-4 py-3 border-b border-border">
         <span className="text-sm font-semibold text-foreground">
           Properties
         </span>
@@ -401,7 +414,7 @@ export function PropertiesPanel({
         <div className="pb-6">
           {mode === "full" && (
             <>
-              <Section icon={Gamepad2} title="Gamepad Info">
+              <Section id="tour-properties-info" icon={Gamepad2} title="Gamepad Info">
             <div className="flex flex-col gap-3 px-4 pb-4">
               <FieldRow label="Name">
                 <Input
@@ -456,7 +469,7 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
-          <Section icon={Palette} title="Theme">
+          <Section id="tour-properties-theme" icon={Palette} title="Theme">
             <div className="flex flex-col gap-3 px-4 pb-4">
               <FieldRow label="Background Color">
                 <ColorInput
@@ -616,7 +629,7 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
-          <Section icon={ShieldCheck} title="Safe Area">
+          <Section id="tour-properties-safe-area" icon={ShieldCheck} title="Safe Area">
             <div className="flex flex-col gap-3 px-4 pb-4">
               {(["top", "bottom", "left", "right"] as const).map((side) => (
                 <FieldRow
@@ -640,7 +653,7 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
-          <Section icon={Monitor} title="System Components">
+          <Section id="tour-properties-system" icon={Monitor} title="System Components">
             <div className="flex flex-col gap-1 px-4 pb-3">
               {(state.layout.systemComponents || []).map((sc) => (
                 <div
@@ -700,7 +713,7 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
-          <Section icon={Layers} title="Components">
+          <Section id="tour-properties-components-list" icon={Layers} title="Components">
             <div className="flex flex-col gap-1 px-4 pb-3">
               {state.layout.components.map((comp) => (
                 <div
@@ -754,7 +767,7 @@ export function PropertiesPanel({
             </div>
           </Section>
           <Separator />
-          <Section icon={Handshake} title="Conflict Resolution">
+          <Section id="tour-properties-conflict" icon={Handshake} title="Conflict Resolution">
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -890,7 +903,7 @@ export function PropertiesPanel({
             </DndContext>
           </Section>
           <Separator />
-          <Section icon={Gamepad} title="Controller Mapping">
+          <Section id="tour-properties-mapping" icon={Gamepad} title="Controller Mapping">
             <div className="flex flex-col gap-3 px-4 pb-4">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground">
@@ -1308,6 +1321,7 @@ export function PropertiesPanel({
           })()}
           {selectedComponent && (
             <Section
+              id="tour-properties-component-edit"
               icon={Settings2}
               title={`Edit: ${getComponentLabel(selectedComponent)}`}
             >

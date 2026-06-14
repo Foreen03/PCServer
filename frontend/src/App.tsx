@@ -3,6 +3,7 @@
 import { useReducer, useState, useCallback, useEffect, useRef } from "react";
 import type { GamepadLayout, EditorAction } from "@/lib/types";
 import { createEmptyLayout } from "@/lib/default-layout";
+import { TourAlertDialog, useTour } from "@/components/tour";
 import { GamepadEditor } from "@/components/GamepadEditor";
 import { MainMenu } from "@/components/MainMenu";
 import { DeviceConnection } from "@/components/DeviceConnection";
@@ -208,6 +209,72 @@ type AppView = "menu" | "editor" | "device-connection" | "library";
 
 export default function Page() {
   const [view, setView] = useState<AppView>("menu");
+  const { startTour, endTour, currentStep, activeTourId, setIsTourCompleted } = useTour();
+  const [openTour, setOpenTour] = useState(false);
+
+  // Auto-start tour dialog on first load of menu
+  useEffect(() => {
+    const isCompleted = typeof window !== "undefined" && localStorage.getItem("bluestep-tour-completed") === "true";
+    if (!isCompleted) {
+      const timer = setTimeout(() => {
+        setOpenTour(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Track and handle multi-page transitions based on the step changes of the "full" tour
+  const lastStepRef = useRef(currentStep);
+  useEffect(() => {
+    if (activeTourId === "full" && currentStep !== lastStepRef.current) {
+      const stepViews = [
+        "menu",              // 0: Menu Header
+        "menu",              // 1: New Layout Card
+        "editor",            // 2: Editor Header
+        "editor",            // 3: Device Select
+        "editor",            // 4: Grid Alignment
+        "editor",            // 5: Canvas
+        "editor",            // 6: Properties Overview
+        "editor",            // 7: Gamepad Info
+        "editor",            // 8: Theme
+        "editor",            // 9: Safe Area Margins
+        "editor",            // 10: System Components
+        "editor",            // 11: Components List
+        "editor",            // 12: Conflict Resolution
+        "editor",            // 13: Controller Mapping
+        "editor",            // 14: Save Button
+        "menu",              // 15: PC Receiver Card
+        "device-connection", // 16: PC Receiver status
+        "device-connection", // 17: PC Receiver actions
+        "device-connection", // 18: GPX simulation
+        "menu",              // 19: Saved Layouts Card
+        "library"            // 20: Library Content
+      ];
+      const targetView = stepViews[currentStep];
+      if (targetView && targetView !== view) {
+        setView(targetView as AppView);
+      }
+      lastStepRef.current = currentStep;
+    }
+  }, [currentStep, activeTourId, view]);
+
+  // Clean up tour states if user navigates manually when tour is active
+  const prevViewRef = useRef(view);
+  const endTourRef = useRef(endTour);
+  useEffect(() => {
+    endTourRef.current = endTour;
+  }, [endTour]);
+
+  useEffect(() => {
+    if (prevViewRef.current !== view) {
+      // If manually changing view and not in dynamic transition, end active tour
+      if (activeTourId !== "full") {
+        endTourRef.current();
+      }
+      prevViewRef.current = view;
+    }
+  }, [view, activeTourId]);
+
   const [state, dispatch] = useReducer(editorReducer, createEmptyLayout());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const previousViewRef = useRef<AppView>("menu");
@@ -526,6 +593,11 @@ export default function Page() {
           onNewLayout={handleNewLayout}
           onOpenLibrary={handleOpenLibrary}
           onConnect={handleConnect}
+          onStartTour={() => {
+            localStorage.removeItem("bluestep-tour-completed");
+            setIsTourCompleted(false);
+            startTour("full");
+          }}
         />
       );
     }
@@ -557,6 +629,10 @@ export default function Page() {
               libraryDeleteCallbackRef.current = resolve;
               sendMessage({ action: "deleteGamepad", id });
             });
+          }}
+          onStartTour={() => {
+            setIsTourCompleted(false);
+            startTour("library");
           }}
         />
       );
@@ -591,6 +667,10 @@ export default function Page() {
               sendMessage({ action: "getGamepad", id: gamepadId });
             });
           }}
+          onStartTour={() => {
+            setIsTourCompleted(false);
+            startTour("connection");
+          }}
         />
       );
     }
@@ -606,6 +686,10 @@ export default function Page() {
           connected={connected}
           onSaveToDb={() => handleSaveToDb()}
           isDirty={isDirty}
+          onStartTour={() => {
+            setIsTourCompleted(false);
+            startTour("editor");
+          }}
         />
 
         {/* Unsaved Changes Dialog */}
@@ -642,6 +726,8 @@ export default function Page() {
   return (
     <>
       {renderView()}
+
+      <TourAlertDialog isOpen={openTour} setIsOpen={setOpenTour} />
 
       {/* Persistent GPX Recording Indicator - visible across all views */}
       {isGpxStarted && (

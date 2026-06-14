@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Gamepad2,
   Bluetooth,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,18 +20,20 @@ interface MainMenuProps {
   onNewLayout: () => void;
   onOpenLibrary: () => void;
   onConnect: () => void;
+  onStartTour: () => void;
 }
 
 export function MainMenu({
   onNewLayout,
   onOpenLibrary,
   onConnect,
+  onStartTour,
 }: MainMenuProps) {
   return (
     <div className="min-h-screen flex flex-col justify-center bg-background">
       <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-background">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div id="tour-main-header" className="text-center mb-12 flex flex-col items-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
             <Gamepad2 className="w-8 h-8 text-primary" />
           </div>
@@ -46,6 +49,7 @@ export function MainMenu({
         <div className="flex flex-col sm:flex-row gap-6 w-full max-w-4xl">
           {/* New Layout Card */}
           <Card
+            id="tour-new-layout"
             className="flex-1 cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
             onClick={onNewLayout}
           >
@@ -65,6 +69,7 @@ export function MainMenu({
 
           {/* Saved Layouts Card */}
           <Card
+            id="tour-saved-layouts"
             className="flex-1 cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
             onClick={onOpenLibrary}
           >
@@ -83,6 +88,7 @@ export function MainMenu({
           </Card>
 
           <Card
+            id="tour-pc-receiver"
             className="flex-1 cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
             onClick={onConnect}
           >
@@ -106,6 +112,15 @@ export function MainMenu({
           Layouts are saved as JSON files compatible with Jetpack Compose
           gamepad overlay systems
         </p>
+
+        <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={onStartTour}
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-primary" /> Start Full Tour
+          </Button>
       </div>
     </div>
   );

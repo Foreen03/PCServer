@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Cast, FolderOpen, Gamepad2, Loader2, MapPin, X } from "lucide-react";
+import { ArrowLeft, Cast, FolderOpen, Gamepad2, Loader2, MapPin, X, HelpCircle } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -61,6 +61,7 @@ interface DeviceConnectionProps {
   loadingVigemGamepads: boolean;
   onRequestVigemGamepads: () => void;
   onFetchGamepadForVigem: (gamepadId: string) => Promise<string>;
+  onStartTour?: () => void;
 }
 
 const GPX_START_POINT_KEY = "gpx-start-point";
@@ -99,6 +100,7 @@ export function DeviceConnection({
   loadingVigemGamepads,
   onRequestVigemGamepads,
   onFetchGamepadForVigem,
+  onStartTour,
 }: DeviceConnectionProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const [isMapOpen, setMapOpen] = useState(false);
@@ -192,13 +194,31 @@ export function DeviceConnection({
               </p>
             </span>
           </div>
+          {onStartTour && (
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={onStartTour}
+                  >
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    <span className="sr-only">Start Tour Guide</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Start Tour Guide</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
         </header>
 
         {/* Main Content Area */}
         <ScrollArea className="flex-1">
           <div className="mx-auto max-w-4xl space-y-6 px-4">
             {/* Status Section */}
-            <div className="space-y-3 pt-4">
+            <div id="tour-connection-status" className="space-y-3 pt-4">
               <h4 className="text-sm font-medium text-foreground">Status</h4>
               <div className="p-4 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card">
                 <div className="flex items-center gap-3">
@@ -250,7 +270,7 @@ export function DeviceConnection({
             </div>
 
             {/* Actions Section */}
-            <div className="space-y-3">
+            <div id="tour-connection-actions" className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Actions</h4>
               <div className="p-4 border rounded-lg space-y-4 bg-card">
                 <div className="flex flex-wrap items-center gap-2">
@@ -303,7 +323,7 @@ export function DeviceConnection({
             </div>
 
             {/* GPX Section */}
-            <div className="space-y-3">
+            <div id="tour-connection-gpx" className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Gpx Trail</h4>
               <div className="p-4 border rounded-lg bg-card space-y-4">
                 {/* Saved start point display */}
@@ -364,7 +384,7 @@ export function DeviceConnection({
             </div>
 
             {/* Logs Section */}
-            <div className="space-y-3">
+            <div id="tour-connection-logs" className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">Logs</h4>
               <ScrollArea className="h-48 w-full p-4 border rounded-lg bg-secondary/30">
                 <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
