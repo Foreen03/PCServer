@@ -120,8 +120,8 @@ export function GamepadLibrary({
   const handleFileSelect = async (file: File) => {
     setError(null);
 
-    if (!file.name.endsWith(".json")) {
-      setError("Please select a JSON file");
+    if (!file.name.endsWith(".bsl")) {
+      setError("Please select a .bsl file");
       return;
     }
 
@@ -217,10 +217,10 @@ export function GamepadLibrary({
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="h-4 w-4" />
-                  <span className="sr-only">Import JSON</span>
+                  <span className="sr-only">Import Layout</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Import JSON</TooltipContent>
+              <TooltipContent>Import Layout</TooltipContent>
             </Tooltip>
 
             {onStartTour && (
@@ -243,7 +243,7 @@ export function GamepadLibrary({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json"
+            accept=".bsl"
             className="hidden"
             onChange={handleInputChange}
           />
@@ -279,7 +279,7 @@ export function GamepadLibrary({
             </h2>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
               Create a new layout in the editor and save it, or import an
-              existing JSON file.
+              existing .bsl file.
             </p>
             <Button
               variant="outline"
@@ -287,7 +287,7 @@ export function GamepadLibrary({
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="h-4 w-4" />
-              Import JSON
+              Import Layout
             </Button>
           </div>
         ) : (

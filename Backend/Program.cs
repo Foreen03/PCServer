@@ -129,7 +129,7 @@ namespace Backend
                         break;
                     case "saveGamepadJson":
                         var jsonLayout = json["layout"]?.ToString();
-                        var requestedFileName = json["fileName"]?.ToString() ?? "gamepad.json";
+                        var requestedFileName = json["fileName"]?.ToString() ?? "gamepad.bsl";
                         if (!string.IsNullOrEmpty(jsonLayout))
                         {
                             try
@@ -291,10 +291,10 @@ namespace Backend
                 using var saveFileDialog = new SaveFileDialog
                 {
                     InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                    Filter = "BlueStep Layout (*.bsl)|*.bsl|All files (*.*)|*.*",
                     FilterIndex = 1,
                     RestoreDirectory = true,
-                    DefaultExt = "json",
+                    DefaultExt = "bsl",
                     FileName = defaultFileName,
                 };
 

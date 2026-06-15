@@ -110,7 +110,7 @@ export function GamepadEditor({
 
   const handleExport = () => {
     const json = JSON.stringify(state, null, 2);
-    const fileName = `${state.gamepad.name.replace(/\s+/g, "_")}.json`;
+    const fileName = `${state.gamepad.name.replace(/\s+/g, "_")}.bsl`;
 
     if (
       typeof window !== "undefined" &&
@@ -122,8 +122,8 @@ export function GamepadEditor({
       });
 
       toast.promise(promise, {
-        loading: "Saving JSON...",
-        success: "JSON saved successfully",
+        loading: "Saving layout...",
+        success: "Layout saved successfully",
         error: (err) => String(err),
         position: "top-center",
       });
@@ -138,14 +138,14 @@ export function GamepadEditor({
       return;
     }
 
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([json], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("JSON saved to Downloads", { position: "top-center" });
+    toast.success("Layout saved to Downloads", { position: "top-center" });
   };
 
   const handleImport = () => {
@@ -389,10 +389,10 @@ export function GamepadEditor({
                   onClick={handleImport}
                 >
                   <Upload className="h-4 w-4" />
-                  <span className="sr-only">Import JSON</span>
+                  <span className="sr-only">Import Layout</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Import JSON</TooltipContent>
+              <TooltipContent>Import Layout</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -404,10 +404,10 @@ export function GamepadEditor({
                   onClick={handleExport}
                 >
                   <Download className="h-4 w-4" />
-                  <span className="sr-only">Export JSON</span>
+                  <span className="sr-only">Export Layout</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Export JSON</TooltipContent>
+              <TooltipContent>Export Layout</TooltipContent>
             </Tooltip>
 
             {onStartTour && (
@@ -456,7 +456,7 @@ export function GamepadEditor({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json"
+            accept=".bsl"
             className="hidden"
             onChange={handleFileChange}
           />

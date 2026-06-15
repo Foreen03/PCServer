@@ -533,7 +533,7 @@ namespace Backend
                 using (OpenFileDialog openFileDialog = new OpenFileDialog())
                 {
                     openFileDialog.InitialDirectory = "c:";
-                    openFileDialog.Filter = "json files (*.json)|*.json|All files (*.*)|*.*";
+                    openFileDialog.Filter = "BlueStep Layout (*.bsl)|*.bsl|All files (*.*)|*.*";
                     openFileDialog.FilterIndex = 1;
                     openFileDialog.RestoreDirectory = true;
 

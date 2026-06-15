@@ -372,7 +372,7 @@ export const librarySteps: TourStep[] = [
           <Upload className="w-4 h-4 text-muted-foreground shrink-0" /> Import Layouts
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Easily import existing layout configurations in `.json` format by clicking this button.
+          Easily import existing layout configurations in `.bsl` format by clicking this button.
         </p>
       </div>
     ),
@@ -694,7 +694,7 @@ export const fullSteps: TourStep[] = [
           <Folder className="w-4 h-4 text-muted-foreground shrink-0" /> Saved layouts Grid
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          All layout files are listed here. You can click them to open, import JSON layouts, or delete unwanted configs.
+          All layout files are listed here. You can click them to open, import .bsl layouts, or delete unwanted configs.
         </p>
       </div>
     ),
