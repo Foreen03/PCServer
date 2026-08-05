@@ -34,7 +34,7 @@ export const menuSteps: TourStep[] = [
           <Gamepad2 className="w-4 h-4 text-muted-foreground shrink-0" /> Welcome to BlueStep
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Welcome to the ultimate tool for mobile gamepad mapping! BlueStep lets you design custom touch controller layouts and use your phone as a Bluetooth gamepad.
+          Welcome to BlueStep! BlueStep allows to design custom touch controller layouts and use your phone as a Bluetooth game controller.
         </p>
       </div>
     ),
@@ -48,7 +48,7 @@ export const menuSteps: TourStep[] = [
           <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" /> Create Custom Layouts
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Click here to design a brand-new gamepad layout. Drag, resize, and configure buttons, joysticks, and touch areas to match your gaming style.
+          Click here to design your gamepad layout. Drag, resize, and configure buttons to match your gaming style.
         </p>
       </div>
     ),
@@ -76,7 +76,7 @@ export const menuSteps: TourStep[] = [
           <Radio className="w-4 h-4 text-muted-foreground shrink-0" /> PC Receiver & Server
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Connect your phone over Bluetooth. Here you can start the GATT server, activate Xbox controller emulation (ViGEm), and record GPX trails for location-based games.
+          Connect your phone over Bluetooth. Here you can start the GATT server, activate Xbox controller emulation (ViGEm), and record GPX trails.
         </p>
       </div>
     ),
@@ -107,7 +107,7 @@ export const editorSteps: TourStep[] = [
           <Smartphone className="w-4 h-4 text-muted-foreground shrink-0" /> Target Device Select
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Select the model of your mobile device. The canvas size and safe areas will automatically adjust to fit the device's screen aspects.
+          Select the model of your mobile device. The editor areas will automatically adjust to fit the device's screen aspects.
         </p>
       </div>
     ),
@@ -121,7 +121,7 @@ export const editorSteps: TourStep[] = [
           <RefreshCw className="w-4 h-4 text-muted-foreground shrink-0" /> Toggle Orientation
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Switch the gamepad layout orientation between Portrait and Landscape to match your design requirements.
+          Switch the gamepad layout orientation between Portrait and Landscape.
         </p>
       </div>
     ),
@@ -135,7 +135,7 @@ export const editorSteps: TourStep[] = [
           <Grid3X3 className="w-4 h-4 text-muted-foreground shrink-0" /> Grid Alignment
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Enable grid snapping and select size intervals to make aligning buttons and control pads precise and clean.
+          Enable grid snapping and select size intervals to make aligning buttons and control pads easier.
         </p>
       </div>
     ),
@@ -149,7 +149,7 @@ export const editorSteps: TourStep[] = [
           <Save className="w-4 h-4 text-muted-foreground shrink-0" /> Save to Library
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Save your current gamepad layout progress to the local database, allowing you to load it later or stream it directly.
+          Save your current gamepad layout by pressing this button, it will be stored in the local database, allowing you to load it later or stream it.
         </p>
       </div>
     ),
@@ -163,13 +163,12 @@ export const editorSteps: TourStep[] = [
           <Monitor className="w-4 h-4 text-muted-foreground shrink-0" /> Interactive Canvas
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          The central canvas displays your virtual touchscreen layout. You can drag and resize components freely.
+          Here is the area where you design your gamepad layout. You can drag and resize components freely.
         </p>
         <div className="text-xs border-t pt-1.5 mt-1.5 border-border space-y-1">
           <p className="font-medium text-foreground"><Lightbulb className="w-3.5 h-3.5 text-yellow-500 inline mr-1 shrink-0" /> Right-Click Actions:</p>
           <ul className="list-disc pl-4 text-muted-foreground space-y-0.5">
-            <li>Right-click a button to Duplicate, Delete, or open Edit Properties (Quick Edit modal).</li>
-            <li>Right-click the canvas background to quickly Add Button or add System Components (Screenshot, Pause).</li>
+            <li>Right-click a button to Duplicate or open Edit Properties (Quick Edit).</li>
           </ul>
         </div>
       </div>
@@ -184,7 +183,7 @@ export const editorSteps: TourStep[] = [
           <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" /> Properties Overview
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          This sidebar is your command center. Its controls change dynamically: select a button on the canvas to configure individual properties, or click the canvas background to adjust global layout options.
+          Here you can configure properties of selected elements. Select a button on the canvas to configure individual properties.
         </p>
       </div>
     ),
@@ -327,7 +326,7 @@ export const connectionSteps: TourStep[] = [
           <MapPin className="w-4 h-4 text-muted-foreground shrink-0" /> GPX Location Trails
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Choose a GPS start point using the interactive Leaflet map, start GPX recording, and export route data to simulate joystick-guided GPS movement.
+          Choose a GPS start point using the interactive map, start GPX recording, and export route data to simulate movement.
         </p>
       </div>
     ),
@@ -358,7 +357,7 @@ export const librarySteps: TourStep[] = [
           <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" /> Saved Layouts Library
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Welcome to your library! Here you can manage all gamepad layouts stored in your local database.
+          Welcome to your layouts library! Here you can manage all gamepad layouts stored in the database.
         </p>
       </div>
     ),
@@ -404,7 +403,7 @@ export const fullSteps: TourStep[] = [
           <Gamepad2 className="w-4 h-4 text-muted-foreground shrink-0" /> Welcome to BlueStep
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Let's explore BlueStep! BlueStep allows you to connect your mobile device as a Bluetooth gamepad and create custom layouts.
+          Welcome to BlueStep! BlueStep allows you to connect your mobile device as a Bluetooth gamepad and create custom layouts.
         </p>
       </div>
     ),
@@ -418,7 +417,7 @@ export const fullSteps: TourStep[] = [
           <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" /> Create Layouts
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Clicking this option opens the Gamepad Editor. Let's see what that looks like!
+          Clicking this option opens the Gamepad Editor where you can create and edit your own gamepad layouts.
         </p>
       </div>
     ),
@@ -447,7 +446,7 @@ export const fullSteps: TourStep[] = [
           <Smartphone className="w-4 h-4 text-muted-foreground shrink-0" /> Choose Target Device
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Set your exact mobile phone model to calibrate the visual safe areas and layout size limits.
+          Select your mobile phone model to see how the layout fits and to set safe areas.
         </p>
       </div>
     ),
@@ -475,13 +474,12 @@ export const fullSteps: TourStep[] = [
           <Monitor className="w-4 h-4 text-muted-foreground shrink-0" /> Drag-and-Drop Canvas
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          The central canvas displays your virtual touchscreen layout. You can drag and resize components freely.
+          Here is the area where you design your gamepad layout. You can drag and resize components freely.
         </p>
         <div className="text-xs border-t pt-1.5 mt-1.5 border-border space-y-1">
           <p className="font-medium text-foreground"><Lightbulb className="w-3.5 h-3.5 text-yellow-500 inline mr-1 shrink-0" /> Right-Click Actions:</p>
           <ul className="list-disc pl-4 text-muted-foreground space-y-0.5">
-            <li>Right-click a button to Duplicate, Delete, or open Edit Properties (Quick Edit modal).</li>
-            <li>Right-click the canvas background to quickly Add Button or add System Components (Screenshot, Pause).</li>
+            <li>Right-click a button to Duplicate or open Edit Properties (Quick Edit modal).</li>
           </ul>
         </div>
       </div>
@@ -496,7 +494,7 @@ export const fullSteps: TourStep[] = [
           <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" /> Properties Overview
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          This sidebar is your command center. Its controls change dynamically: select a button on the canvas to configure individual properties, or click the canvas background to adjust global layout options.
+          Here you can configure properties of selected elements. Select a button on the canvas to configure individual properties.
         </p>
       </div>
     ),
@@ -608,7 +606,7 @@ export const fullSteps: TourStep[] = [
           <Save className="w-4 h-4 text-muted-foreground shrink-0" /> Save Layout
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Once your design is ready, save it to your local library. Next, let's look at how to connect a device.
+          Once your design is ready, save it to your local library. Next, let's see how to connect a device.
         </p>
       </div>
     ),
@@ -623,7 +621,7 @@ export const fullSteps: TourStep[] = [
           <Radio className="w-4 h-4 text-muted-foreground shrink-0" /> PC Receiver Panel
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Let's jump into the PC Receiver page, which sets up the Bluetooth server to link your mobile client to the PC.
+          This is the PC Receiver page, which sets up the Bluetooth server to link your mobile client to the PC.
         </p>
       </div>
     ),
@@ -680,7 +678,7 @@ export const fullSteps: TourStep[] = [
           <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" /> Saved Layouts Card
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Finally, let's explore how saved files are displayed in the Saved Layouts Library.
+          Welcome to the layouts library! Here you can manage all gamepad layouts stored in the database.
         </p>
       </div>
     ),
