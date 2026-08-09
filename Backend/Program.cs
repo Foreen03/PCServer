@@ -44,6 +44,7 @@ namespace Backend
                 .Center();
 
             GamepadDatabase.Initialize();
+            CheckVigemBusDriver();
 
             _gattManager.SetWindow(_window);
             _customPluginController.SetWindow(_window);
@@ -268,6 +269,34 @@ namespace Backend
 #endif
 
             _window.WaitForClose();
+        }
+
+        private static void CheckVigemBusDriver()
+        {
+            try
+            {
+                using (var client = new Nefarius.ViGEm.Client.ViGEmClient())
+                {
+                    // Driver exists
+                }
+            }
+            catch (Exception)
+            {
+                var result = MessageBox.Show(
+                    "ViGEmBus driver was not found. This driver is required for controller emulation.\n\nWould you like to download it now?",
+                    "Missing Driver",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "https://vigembusdriver.com/download/",
+                        UseShellExecute = true
+                    });
+                }
+            }
         }
 
         private static string SaveGamepadJsonFile(string json, string defaultFileName)
