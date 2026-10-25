@@ -52,11 +52,84 @@ namespace Backend
         {
             if (string.IsNullOrEmpty(json))
             {
-                Log("No controller mapping provided. Controller mapping will be disabled.");
+                LoadDefaultMapping();
                 return;
             }
-            Log($"Loaded controller mapping from database.");
-            controllerMapping = JsonConvert.DeserializeObject<ControllerMapping>(json);
+
+            try
+            {
+                controllerMapping = JsonConvert.DeserializeObject<ControllerMapping>(json);
+                if (controllerMapping?.Mapping == null)
+                {
+                    var directConfig = JsonConvert.DeserializeObject<MappingConfig>(json);
+                    if (directConfig != null)
+                    {
+                        controllerMapping = new ControllerMapping { Mapping = directConfig };
+                    }
+                }
+
+                if (controllerMapping?.Mapping != null)
+                {
+                    controllerMapping.Mapping.Enabled = true;
+                    Log($"Loaded controller mapping from database (Buttons: {controllerMapping.Mapping.ButtonMap?.Count ?? 0}).");
+                }
+                else
+                {
+                    LoadDefaultMapping();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error loading controller mapping: {ex.Message}. Loading default mapping.");
+                LoadDefaultMapping();
+            }
+        }
+
+        private void LoadDefaultMapping()
+        {
+            try
+            {
+                var defaultJson = GamepadDatabase.GetGamepad("stk_standard_buttons");
+                if (!string.IsNullOrEmpty(defaultJson))
+                {
+                    var jObj = Newtonsoft.Json.Linq.JObject.Parse(defaultJson);
+                    var mappingToken = jObj["controllerMapping"];
+                    if (mappingToken != null)
+                    {
+                        var mapping = mappingToken.ToObject<MappingConfig>();
+                        if (mapping != null)
+                        {
+                            mapping.Enabled = true;
+                            controllerMapping = new ControllerMapping { Mapping = mapping };
+                            Log("Loaded standard default Xbox 360 controller mapping.");
+                            return;
+                        }
+                    }
+                }
+
+                controllerMapping = new ControllerMapping
+                {
+                    Mapping = new MappingConfig
+                    {
+                        Enabled = true,
+                        ButtonMap = new Dictionary<string, string>
+                        {
+                            { "face_a", "A" }, { "face_b", "B" }, { "face_x", "X" }, { "face_y", "Y" },
+                            { "a", "A" }, { "b", "B" }, { "x", "X" }, { "y", "Y" },
+                            { "shoulder_left", "LeftShoulder" }, { "shoulder_right", "RightShoulder" },
+                            { "dpad_up", "Up" }, { "dpad_down", "Down" }, { "dpad_left", "Left" }, { "dpad_right", "Right" },
+                            { "start", "Start" }, { "back", "Back" }
+                        },
+                        AxisMap = new Dictionary<string, AxisConfig>(),
+                        SensorMap = new Dictionary<string, SensorConfig>()
+                    }
+                };
+                Log("Loaded built-in standard Xbox 360 controller mapping.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error loading default mapping: {ex.Message}");
+            }
         }
 
         public void Activate()

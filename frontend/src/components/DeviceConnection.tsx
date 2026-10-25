@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -137,25 +138,52 @@ export function DeviceConnection({
     onRequestVigemGamepads();
   }, [onRequestVigemGamepads]);
 
+  const handleActivateDefaultVigem = useCallback(() => {
+    onActivateMode("vigem", "");
+    setVigemDialogOpen(false);
+    toast.success("ViGEm mode activated with default Xbox 360 mapping");
+  }, [onActivateMode]);
+
   const handleSelectGamepad = useCallback(
     async (gamepad: GamepadSummary) => {
-      setLoadingGamepadId(gamepad.Id);
+      const id = gamepad.Id || (gamepad as any).id;
+      if (!id) {
+        toast.error("Invalid gamepad ID");
+        return;
+      }
+      setLoadingGamepadId(id);
       try {
-        const layoutJson = await onFetchGamepadForVigem(gamepad.Id);
-        // Parse the layout JSON to extract controllerMapping
+        const layoutJson = await onFetchGamepadForVigem(id);
+        if (!layoutJson) {
+          onActivateMode("vigem", "");
+          toast.info("No custom mapping data found. Activated ViGEm with default mapping.");
+          setVigemDialogOpen(false);
+          return;
+        }
+
         try {
-          const layoutObj = JSON.parse(layoutJson);
-          const controllerMapping = layoutObj.controllerMapping;
+          const layoutObj = typeof layoutJson === "string" ? JSON.parse(layoutJson) : layoutJson;
+          const controllerMapping = layoutObj.controllerMapping || layoutObj.Mapping;
           if (controllerMapping) {
-            const mappingJson = JSON.stringify({ controllerMapping });
-            onActivateMode("vigem", mappingJson);
+            const mappingToSend = {
+              controllerMapping: {
+                ...controllerMapping,
+                enabled: true,
+              },
+            };
+            onActivateMode("vigem", JSON.stringify(mappingToSend));
+            toast.success(`ViGEm mode activated with mapping: ${gamepad.Name || (gamepad as any).name || "Selected Layout"}`);
           } else {
             onActivateMode("vigem", "");
+            toast.info("No custom controller mapping found. Activated ViGEm with default mapping.");
           }
         } catch {
           onActivateMode("vigem", "");
+          toast.info("Activated ViGEm mode with default mapping.");
         }
         setVigemDialogOpen(false);
+      } catch (err: any) {
+        toast.error(`Error loading layout: ${err?.message || "Unknown error"}`);
       } finally {
         setLoadingGamepadId(null);
       }
@@ -489,71 +517,110 @@ export function DeviceConnection({
         )}
 
         {/* Vigem Gamepad Selection Dialog */}
-        <Dialog open={isVigemDialogOpen} onOpenChange={setVigemDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
+        <Dialog open={isVigemDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setLoadingGamepadId(null);
+          }
+          setVigemDialogOpen(open);
+        }}>
+          <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col gap-0 p-6 overflow-hidden">
+            <DialogHeader className="shrink-0 pb-3">
               <DialogTitle>Select Mapping for ViGEm</DialogTitle>
               <DialogDescription>
                 Choose a gamepad with controller mapping enabled to use with ViGEm mode.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-2">
+            <div className="flex-1 min-h-0 overflow-hidden py-1">
               {loadingVigemGamepads ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   <span className="ml-2 text-sm text-muted-foreground">Loading gamepads...</span>
                 </div>
               ) : vigemGamepads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <Gamepad2 className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    No gamepads with controller mapping enabled found.
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    Enable controller mapping in the gamepad editor first.
-                  </p>
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-3">
+                  <Gamepad2 className="h-10 w-10 text-muted-foreground/50" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      No gamepads with controller mapping enabled found.
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Enable controller mapping in the gamepad editor first, or continue with standard Xbox 360 mapping.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleActivateDefaultVigem}
+                    size="sm"
+                    className="mt-2"
+                  >
+                    Activate with Default Mapping
+                  </Button>
                 </div>
               ) : (
-                <ScrollArea className="max-h-[300px]">
-                  <div className="space-y-2">
-                    {vigemGamepads.map((gp) => (
+                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-2">
+                  {vigemGamepads.map((gp) => {
+                    const id = gp.Id || (gp as any).id || "";
+                    const name = gp.Name || (gp as any).name || "Untitled Layout";
+                    const description = gp.Description || (gp as any).description || "";
+                    const orientation = gp.Orientation || (gp as any).orientation || "landscape";
+                    const version = gp.Version || (gp as any).version || 1;
+
+                    return (
                       <button
-                        key={gp.Id}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/60 transition-colors text-left disabled:opacity-50"
+                        key={id}
+                        type="button"
+                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/60 transition-colors text-left disabled:opacity-50 overflow-hidden"
                         onClick={() => handleSelectGamepad(gp)}
                         disabled={loadingGamepadId !== null}
                       >
-                        <div className="flex-shrink-0 w-9 h-9 rounded-md bg-primary/15 flex items-center justify-center">
-                          {loadingGamepadId === gp.Id ? (
+                        <div className="shrink-0 w-9 h-9 rounded-md bg-primary/15 flex items-center justify-center">
+                          {loadingGamepadId === id ? (
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           ) : (
                             <Gamepad2 className="h-4 w-4 text-primary" />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <p className="text-sm font-medium text-foreground truncate">
-                            {gp.Name}
+                            {name}
                           </p>
-                          {gp.Description && (
+                          {description ? (
                             <p className="text-xs text-muted-foreground truncate">
-                              {gp.Description}
+                              {description}
                             </p>
-                          )}
+                          ) : null}
                         </div>
-                        <div className="flex-shrink-0 flex flex-col items-end gap-0.5">
+                        <div className="shrink-0 flex flex-col items-end gap-0.5 ml-2">
                           <Badge variant="outline" className="text-[10px] capitalize">
-                            {gp.Orientation}
+                            {orientation}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground">
-                            v{gp.Version}
+                            v{version}
                           </span>
                         </div>
                       </button>
-                    ))}
-                  </div>
-                </ScrollArea>
+                    );
+                  })}
+                </div>
               )}
             </div>
+            <DialogFooter className="shrink-0 flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-2 pt-4 mt-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleActivateDefaultVigem}
+                disabled={loadingGamepadId !== null}
+              >
+                Use Default Mapping
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVigemDialogOpen(false)}
+                disabled={loadingGamepadId !== null}
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

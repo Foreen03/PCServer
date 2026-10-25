@@ -501,8 +501,8 @@ export default function Page() {
               break;
             case "dbGamepadData":
               // Vigem flow takes priority
-              if (vigemGamepadCallbackRef.current && data.layout) {
-                vigemGamepadCallbackRef.current(data.layout);
+              if (vigemGamepadCallbackRef.current) {
+                vigemGamepadCallbackRef.current(data.layout ?? "");
                 vigemGamepadCallbackRef.current = null;
               } else if (libraryGamepadCallbackRef.current) {
                 libraryGamepadCallbackRef.current(data.layout ?? null);
