@@ -36,6 +36,7 @@
     <Compile Include="WebSocketHost.cs" />
     <Compile Include="GpxTrail.cs" />
     <Compile Include="TrackPoint.cs" />
+    <Compile Include="StepLogger.cs" />
     <None Include="app.manifest" />
   </ItemGroup>
 

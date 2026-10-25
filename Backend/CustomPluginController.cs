@@ -364,6 +364,7 @@ namespace Backend
                             az = Convert.ToSingle(p.payload["z"]);
                             stepsCadence = Convert.ToSingle(p.payload["stepsCadence"]);
                             lastTimestamp = ts;
+                            StepLogger.Record(steps, ts);
 
                             if (p.payload.ContainsKey("buttons"))
                             {

@@ -118,6 +118,16 @@ namespace Backend
 
                             if (p.packetType == "movement")
                             {
+                                if (p.payload != null && p.payload.TryGetValue("steps", out var stepsVal))
+                                {
+                                    try
+                                    {
+                                        int steps = Convert.ToInt32(stepsVal);
+                                        StepLogger.Record(steps, p.timeStamp);
+                                    }
+                                    catch { }
+                                }
+
                                 ProcessSensors(p, controllerMapping.Mapping, controller);
                                 gpxTrail.Update(p);
                                 _walkedDistance = gpxTrail.DistanceWalkedKm;

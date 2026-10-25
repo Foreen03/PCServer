@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Cast, FolderOpen, Gamepad2, Loader2, MapPin, X, HelpCircle } from "lucide-react";
+import { ArrowLeft, Cast, Download, FolderOpen, Gamepad2, Loader2, MapPin, X, HelpCircle } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -54,6 +54,8 @@ interface DeviceConnectionProps {
   onDeactivateMode: () => void;
   onSendLayout: () => void;
   onExportGpx: () => void;
+  onExportStepLogs?: (showDialog?: boolean) => void;
+  stepLogCount?: number;
   onStartGpx: (lat: number, lng: number) => void;
   isGpxStarted: boolean;
   sendMessage: (payload: object) => void;
@@ -93,6 +95,8 @@ export function DeviceConnection({
   onDeactivateMode,
   onSendLayout,
   onExportGpx,
+  onExportStepLogs,
+  stepLogCount,
   onStartGpx,
   isGpxStarted,
   sendMessage,
@@ -379,13 +383,58 @@ export function DeviceConnection({
                     <FolderOpen className="h-4 w-4 mr-1" />
                     GPX Files
                   </Button>
+                  <Button
+                    onClick={() => onExportStepLogs?.(true)}
+                    variant="outline"
+                    size="default"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Export Step Logs
+                  </Button>
+                  <Button
+                    onClick={() => sendMessage({ action: "openLogsFolder" })}
+                    variant="outline"
+                    size="default"
+                  >
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    Step Logs
+                  </Button>
                 </div>
               </div>
             </div>
 
             {/* Logs Section */}
             <div id="tour-connection-logs" className="space-y-3">
-              <h4 className="text-sm font-medium text-foreground">Logs</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-foreground">Logs</h4>
+                  {stepLogCount !== undefined && stepLogCount > 0 && (
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {stepLogCount} step {stepLogCount === 1 ? "entry" : "entries"}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onExportStepLogs?.(true)}
+                    className="h-8 text-xs"
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    Export Step Logs (.txt)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => sendMessage({ action: "openLogsFolder" })}
+                    className="h-8 text-xs"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5 mr-1" />
+                    Logs Folder
+                  </Button>
+                </div>
+              </div>
               <ScrollArea className="h-48 w-full p-4 border rounded-lg bg-secondary/30">
                 <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
                   {logs.length > 0 ? logs.join("\n") : "No logs yet..."}

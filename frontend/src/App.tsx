@@ -281,6 +281,7 @@ export default function Page() {
   const [gattStatus, setGattStatus] = useState("stopped");
   const [activeMode, setActiveMode] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
+  const [stepLogCount, setStepLogCount] = useState<number>(0);
   const [connected, setConnected] = useState(false);
   const [isGpxStarted, setGpxStarted] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -529,6 +530,20 @@ export default function Page() {
                 setGpxStarted(data.started);
               }
               break;
+            case "stepLogCount":
+              if (typeof data.count === "number") {
+                setStepLogCount(data.count);
+              }
+              break;
+            case "stepLogExportResult":
+              if (data.status === "success") {
+                toast.success(`Exported ${data.count ?? 0} step logs to: ${data.filePath}`);
+              } else if (data.status === "cancelled") {
+                toast.info("Step log export cancelled");
+              } else if (data.status === "error") {
+                toast.error(`Failed to export step logs: ${data.error}`);
+              }
+              break;
           }
         } catch (error) {
           setLogs((prevLogs) =>
@@ -579,6 +594,10 @@ export default function Page() {
   const handleExportGpx = () => {
     sendMessage({ action: "exportGpx" });
     setGpxStarted(false);
+  };
+
+  const handleExportStepLogs = (showDialog = true) => {
+    sendMessage({ action: "exportStepLogs", showDialog });
   };
 
   const handleStartGpx = (lat: number, lng: number) => {
@@ -652,6 +671,8 @@ export default function Page() {
           onDeactivateMode={handleDeactivateMode}
           onSendLayout={handleSendLayout}
           onExportGpx={handleExportGpx}
+          onExportStepLogs={handleExportStepLogs}
+          stepLogCount={stepLogCount}
           onStartGpx={handleStartGpx}
           isGpxStarted={isGpxStarted}
           sendMessage={sendMessage}

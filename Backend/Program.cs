@@ -49,9 +49,11 @@ namespace Backend
             _gattManager.SetWindow(_window);
             _customPluginController.SetWindow(_window);
             _vigemController.SetWindow(_window);
+            StepLogger.SetWindow(_window);
 
             _gattManager.OnDataReceived += (sender, data) =>
             {
+                StepLogger.RecordFromPacket(data);
                 _activeController?.ProcessData(data);
             };
 
@@ -256,6 +258,82 @@ namespace Backend
                             Directory.CreateDirectory(gpxDir);
                             System.Diagnostics.Process.Start("explorer.exe", gpxDir);
                         }
+                        break;
+
+                    case "exportStepLogs":
+                    case "exportLogs":
+                        try
+                        {
+                            var targetFile = json["filePath"]?.ToString();
+                            var showDialog = json["showDialog"]?.ToObject<bool>() ?? false;
+                            string exportedPath;
+
+                            if (showDialog)
+                            {
+                                var defaultFileName = $"step_logs_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                                exportedPath = StepLogger.ExportWithDialog(defaultFileName);
+                            }
+                            else
+                            {
+                                exportedPath = StepLogger.Export(targetFile);
+                            }
+
+                            if (!string.IsNullOrEmpty(exportedPath))
+                            {
+                                photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                                {
+                                    type = "stepLogExportResult",
+                                    status = "success",
+                                    filePath = exportedPath,
+                                    count = StepLogger.Count
+                                }));
+                                photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                                {
+                                    type = "log",
+                                    message = $"[StepLogger] Exported {StepLogger.Count} step log records to {exportedPath}"
+                                }));
+                            }
+                            else
+                            {
+                                photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                                {
+                                    type = "stepLogExportResult",
+                                    status = "cancelled"
+                                }));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                            {
+                                type = "stepLogExportResult",
+                                status = "error",
+                                error = ex.Message
+                            }));
+                        }
+                        break;
+
+                    case "openLogsFolder":
+                        try
+                        {
+                            string logsDir = StepLogger.GetLogsDirectory();
+                            Directory.CreateDirectory(logsDir);
+                            System.Diagnostics.Process.Start("explorer.exe", logsDir);
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "log", message = $"[StepLogger] Error opening logs folder: {ex.Message}" }));
+                        }
+                        break;
+
+                    case "clearStepLogs":
+                        StepLogger.Clear();
+                        photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "stepLogCount", count = 0 }));
+                        photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "log", message = "[StepLogger] Cleared recorded step logs." }));
+                        break;
+
+                    case "getStepLogCount":
+                        photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "stepLogCount", count = StepLogger.Count }));
                         break;
                 }
             });
