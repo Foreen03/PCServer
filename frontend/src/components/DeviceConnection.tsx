@@ -9,7 +9,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Cast, Download, FolderOpen, Gamepad2, Loader2, MapPin, X, HelpCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Cast,
+  Download,
+  Film,
+  FolderOpen,
+  Gamepad2,
+  HelpCircle,
+  Loader2,
+  MapPin,
+  Monitor,
+  Play,
+  Square,
+  Video,
+  Volume2,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -57,6 +73,17 @@ interface DeviceConnectionProps {
   onExportGpx: () => void;
   onExportStepLogs?: (showDialog?: boolean) => void;
   stepLogCount?: number;
+  onStartLogging?: (options: {
+    recordScreen: boolean;
+    recordAudio: boolean;
+    captureTarget: string;
+    windowTitle?: string;
+  }) => void;
+  onStopLogging?: () => void;
+  isSessionLogging?: boolean;
+  sessionStepCount?: number;
+  sessionStartTime?: number | null;
+  isRecordingScreen?: boolean;
   onStartGpx: (lat: number, lng: number) => void;
   isGpxStarted: boolean;
   sendMessage: (payload: object) => void;
@@ -84,6 +111,12 @@ function loadSavedStartPoint(): { lat: number; lng: number } | null {
   return null;
 }
 
+function formatDuration(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
 export function DeviceConnection({
   onBackToMenu,
   gattStatus,
@@ -98,6 +131,12 @@ export function DeviceConnection({
   onExportGpx,
   onExportStepLogs,
   stepLogCount,
+  onStartLogging,
+  onStopLogging,
+  isSessionLogging = false,
+  sessionStepCount = 0,
+  sessionStartTime = null,
+  isRecordingScreen = true,
   onStartGpx,
   isGpxStarted,
   sendMessage,
@@ -112,6 +151,32 @@ export function DeviceConnection({
   const [isVigemDialogOpen, setVigemDialogOpen] = useState(false);
   const [loadingGamepadId, setLoadingGamepadId] = useState<string | null>(null);
   const [gpxStartPoint, setGpxStartPoint] = useState<{ lat: number; lng: number } | null>(loadSavedStartPoint);
+  const [recordScreen, setRecordScreen] = useState(true);
+  const [recordAudio, setRecordAudio] = useState(true);
+  const [captureTarget, setCaptureTarget] = useState("auto");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (isSessionLogging) {
+      const start = sessionStartTime || Date.now();
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+      timer = setInterval(() => {
+        setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(timer);
+  }, [isSessionLogging, sessionStartTime]);
+
+  const handleStartLoggingClick = useCallback(() => {
+    onStartLogging?.({
+      recordScreen,
+      recordAudio,
+      captureTarget,
+    });
+  }, [onStartLogging, recordScreen, recordAudio, captureTarget]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -428,6 +493,121 @@ export function DeviceConnection({
                     Step Logs
                   </Button>
                 </div>
+              </div>
+            </div>
+
+            {/* Game Screen Recording & Step Logging Section */}
+            <div id="tour-connection-recording" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-foreground">Game Screen & Step Logging</h4>
+                  {isSessionLogging ? (
+                    <Badge variant="destructive" className="flex items-center gap-1.5 text-xs font-mono">
+                      <span className="h-2 w-2 rounded-full bg-white animate-ping inline-block" />
+                      {isRecordingScreen ? "REC SCREEN" : "REC STEPS"} {formatDuration(elapsedSeconds)}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      Idle
+                    </Badge>
+                  )}
+                </div>
+                {isSessionLogging && sessionStepCount > 0 && (
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {sessionStepCount} session {sessionStepCount === 1 ? "step" : "steps"}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="p-4 border rounded-lg bg-card space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {!isSessionLogging ? (
+                      <Button
+                        onClick={handleStartLoggingClick}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                      >
+                        <Play className="h-4 w-4 mr-1.5 fill-current" />
+                        Start Logging
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={onStopLogging}
+                        variant="destructive"
+                        className="font-medium animate-pulse"
+                      >
+                        <Square className="h-4 w-4 mr-1.5 fill-current" />
+                        Stop Logging
+                      </Button>
+                    )}
+
+                    <Button
+                      onClick={() => sendMessage({ action: "openRecordingsFolder" })}
+                      variant="outline"
+                      size="default"
+                    >
+                      <Film className="h-4 w-4 mr-1.5" />
+                      Recordings Folder
+                    </Button>
+                  </div>
+
+                  {/* Settings options */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={recordScreen}
+                        disabled={isSessionLogging}
+                        onChange={(e) => setRecordScreen(e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                      />
+                      <Video className="h-3.5 w-3.5" />
+                      <span>Record Game Screen (.mp4)</span>
+                    </label>
+
+                    {recordScreen && (
+                      <>
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={recordAudio}
+                            disabled={isSessionLogging}
+                            onChange={(e) => setRecordAudio(e.target.checked)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <Volume2 className="h-3.5 w-3.5" />
+                          <span>Game Audio</span>
+                        </label>
+
+                        <div className="flex items-center gap-1.5">
+                          <Monitor className="h-3.5 w-3.5" />
+                          <select
+                            value={captureTarget}
+                            disabled={isSessionLogging}
+                            onChange={(e) => setCaptureTarget(e.target.value)}
+                            className="bg-background border rounded px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="auto">Auto Game Window</option>
+                            <option value="monitor">Primary Monitor</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {isSessionLogging && (
+                  <div className="text-xs text-muted-foreground flex items-center justify-between border-t pt-2 mt-1">
+                    <span>
+                      {recordScreen
+                        ? "Synchronizing game screen video with step data (timestamps & subtitle track matched)..."
+                        : "Recording step packets with synchronized relative timestamps..."}
+                    </span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                      Live session steps: {sessionStepCount}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

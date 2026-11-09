@@ -415,6 +415,18 @@ namespace Backend
                     case "command":
                         if (p.payload.TryGetValue("command", out var command) && command != null)
                         {
+                            var cmdStr = command.ToString()?.ToLower();
+                            if (cmdStr == "start_logging" || cmdStr == "startlogging")
+                            {
+                                StepLogger.StartSession();
+                                Log("[StepLogger] Started logging and screen recording from controller command.");
+                            }
+                            else if (cmdStr == "stop_logging" || cmdStr == "stoplogging")
+                            {
+                                _ = StepLogger.StopSessionAsync();
+                                Log("[StepLogger] Stopped logging and screen recording from controller command.");
+                            }
+
                             WebSocketHost.Broadcast(new
                             {
                                 type = "command",

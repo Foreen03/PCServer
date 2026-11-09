@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -9,6 +13,10 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>connection.ico</ApplicationIcon>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +26,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
     <PackageReference Include="RedCorners.ExifLibrary" Version="2.0.0" />
+    <PackageReference Include="ScreenRecorderLib" Version="7.0.1" />
     <PackageReference Include="SharpDX.Direct3D11" Version="4.2.0" />
     <PackageReference Include="SharpDX.DXGI" Version="4.2.0" />
   </ItemGroup>
@@ -32,6 +41,7 @@
     <Compile Include="PCPacket.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ScreenCapture.cs" />
+    <Compile Include="GameScreenRecorder.cs" />
     <Compile Include="VigemController.cs" />
     <Compile Include="WebSocketHost.cs" />
     <Compile Include="GpxTrail.cs" />
@@ -44,7 +54,33 @@
     <None Include="connection.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="recordings\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Include="logs\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Include="screenshots\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Include="gpx\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
+
+  <Target Name="CreateAppDirectories" AfterTargets="Build">
+    <MakeDir Directories="$(TargetDir)recordings;$(TargetDir)logs;$(TargetDir)screenshots;$(TargetDir)gpx" />
+  </Target>
+
+  <Target Name="CreatePublishDirectories" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)recordings;$(PublishDir)logs;$(PublishDir)screenshots;$(PublishDir)gpx" />
+    <Copy SourceFiles="$(TargetDir)ScreenRecorderLib.dll" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)ScreenRecorderLib.dll')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetDir)ScreenRecorderLib.pdb" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)ScreenRecorderLib.pdb')" SkipUnchangedFiles="true" />
+  </Target>
 
   <Target Name="BuildFrontend">
     <Exec Command="node --version" ContinueOnError="true">

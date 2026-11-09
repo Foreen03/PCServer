@@ -254,6 +254,16 @@ namespace Backend
                 {
                     CaptureScreen();
                 }
+                else if (commandStr == "start_logging" || commandStr == "startlogging")
+                {
+                    StepLogger.StartSession();
+                    Log("[StepLogger] Started logging and screen recording from controller command.");
+                }
+                else if (commandStr == "stop_logging" || commandStr == "stoplogging")
+                {
+                    _ = StepLogger.StopSessionAsync();
+                    Log("[StepLogger] Stopped logging and screen recording from controller command.");
+                }
                 else if (commandStr == "pause")
                 {
                     // Press Start, submit, then release after delay — outside the main lock

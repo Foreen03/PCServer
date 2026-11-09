@@ -282,6 +282,10 @@ export default function Page() {
   const [activeMode, setActiveMode] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [stepLogCount, setStepLogCount] = useState<number>(0);
+  const [isSessionLogging, setIsSessionLogging] = useState(false);
+  const [sessionStepCount, setSessionStepCount] = useState(0);
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [isRecordingScreen, setIsRecordingScreen] = useState(true);
   const [connected, setConnected] = useState(false);
   const [isGpxStarted, setGpxStarted] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -534,6 +538,45 @@ export default function Page() {
               if (typeof data.count === "number") {
                 setStepLogCount(data.count);
               }
+              if (typeof data.sessionCount === "number") {
+                setSessionStepCount(data.sessionCount);
+              }
+              if (typeof data.isLogging === "boolean") {
+                setIsSessionLogging(data.isLogging);
+              }
+              break;
+            case "loggingStatus":
+              if (typeof data.isLogging === "boolean") {
+                setIsSessionLogging(data.isLogging);
+              }
+              if (typeof data.sessionStartTime === "number") {
+                setSessionStartTime(data.sessionStartTime);
+              }
+              if (typeof data.isRecordingScreen === "boolean") {
+                setIsRecordingScreen(data.isRecordingScreen);
+              }
+              if (typeof data.sessionCount === "number") {
+                setSessionStepCount(data.sessionCount);
+              }
+              if (!data.isLogging && data.stepsPath) {
+                const videoNotice = data.videoPath ? ` Video & steps saved!` : ` Steps log saved!`;
+                toast.success(`Logging session complete! (${data.sessionCount ?? 0} steps).${videoNotice}`);
+              }
+              break;
+            case "startLoggingResult":
+              if (data.status === "success") {
+                setIsSessionLogging(true);
+                toast.success(data.isRecordingScreen ? "Screen recording and step logging started!" : "Step logging started!");
+              } else if (data.status === "error") {
+                toast.error(`Failed to start logging: ${data.error}`);
+              }
+              break;
+            case "stopLoggingResult":
+              if (data.status === "success") {
+                setIsSessionLogging(false);
+              } else if (data.status === "error") {
+                toast.error(`Error stopping logging: ${data.error}`);
+              }
               break;
             case "stepLogExportResult":
               if (data.status === "success") {
@@ -598,6 +641,25 @@ export default function Page() {
 
   const handleExportStepLogs = (showDialog = true) => {
     sendMessage({ action: "exportStepLogs", showDialog });
+  };
+
+  const handleStartLogging = (options: {
+    recordScreen: boolean;
+    recordAudio: boolean;
+    captureTarget: string;
+    windowTitle?: string;
+  }) => {
+    sendMessage({
+      action: "startLogging",
+      recordScreen: options.recordScreen,
+      recordAudio: options.recordAudio,
+      captureTarget: options.captureTarget,
+      windowTitle: options.windowTitle,
+    });
+  };
+
+  const handleStopLogging = () => {
+    sendMessage({ action: "stopLogging" });
   };
 
   const handleStartGpx = (lat: number, lng: number) => {
@@ -673,6 +735,12 @@ export default function Page() {
           onExportGpx={handleExportGpx}
           onExportStepLogs={handleExportStepLogs}
           stepLogCount={stepLogCount}
+          onStartLogging={handleStartLogging}
+          onStopLogging={handleStopLogging}
+          isSessionLogging={isSessionLogging}
+          sessionStepCount={sessionStepCount}
+          sessionStartTime={sessionStartTime}
+          isRecordingScreen={isRecordingScreen}
           onStartGpx={handleStartGpx}
           isGpxStarted={isGpxStarted}
           sendMessage={sendMessage}

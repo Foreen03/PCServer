@@ -45,6 +45,8 @@ namespace Backend
 
             GamepadDatabase.Initialize();
             CheckVigemBusDriver();
+            GameScreenRecorder.GetRecordingsDirectory();
+            StepLogger.GetLogsDirectory();
 
             _gattManager.SetWindow(_window);
             _customPluginController.SetWindow(_window);
@@ -335,7 +337,91 @@ namespace Backend
                     case "getStepLogCount":
                         photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "stepLogCount", count = StepLogger.Count }));
                         break;
+
+                    case "startLogging":
+                        try
+                        {
+                            bool recordScreen = json["recordScreen"]?.ToObject<bool>() ?? true;
+                            bool recordAudio = json["recordAudio"]?.ToObject<bool>() ?? true;
+                            string? windowTitle = json["windowTitle"]?.ToString();
+                            string captureTarget = json["captureTarget"]?.ToString() ?? "auto";
+
+                            bool started = StepLogger.StartSession(recordScreen, recordAudio, windowTitle, captureTarget);
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                            {
+                                type = "startLoggingResult",
+                                status = started ? "success" : "failed",
+                                isLogging = StepLogger.IsSessionLogging,
+                                isRecordingScreen = StepLogger.IsRecordingScreen
+                            }));
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                            {
+                                type = "startLoggingResult",
+                                status = "error",
+                                error = ex.Message
+                            }));
+                        }
+                        break;
+
+                    case "stopLogging":
+                        try
+                        {
+                            var (videoPath, stepsPath, summaryPath, subtitlePath, count) = await StepLogger.StopSessionAsync();
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                            {
+                                type = "stopLoggingResult",
+                                status = "success",
+                                videoPath = videoPath,
+                                stepsPath = stepsPath,
+                                summaryPath = summaryPath,
+                                subtitlePath = subtitlePath,
+                                count = count
+                            }));
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new
+                            {
+                                type = "stopLoggingResult",
+                                status = "error",
+                                error = ex.Message
+                            }));
+                        }
+                        break;
+
+                    case "getLoggingStatus":
+                        StepLogger.NotifyUiLoggingStatus();
+                        break;
+
+                    case "openRecordingsFolder":
+                        try
+                        {
+                            string recDir = GameScreenRecorder.GetRecordingsDirectory();
+                            Directory.CreateDirectory(recDir);
+                            System.Diagnostics.Process.Start("explorer.exe", recDir);
+                        }
+                        catch (Exception ex)
+                        {
+                            photinoWindow.SendWebMessage(JsonSerializer.Serialize(new { type = "log", message = $"[GameScreenRecorder] Error opening recordings folder: {ex.Message}" }));
+                        }
+                        break;
                 }
+            });
+
+            _window.RegisterWindowClosingHandler((sender, args) =>
+            {
+                if (StepLogger.IsSessionLogging)
+                {
+                    try
+                    {
+                        StepLogger.StopSessionAsync().GetAwaiter().GetResult();
+                    }
+                    catch { }
+                }
+                return false;
             });
 
 #if DEBUG
@@ -347,6 +433,15 @@ namespace Backend
 #endif
 
             _window.WaitForClose();
+
+            if (StepLogger.IsSessionLogging)
+            {
+                try
+                {
+                    StepLogger.StopSessionAsync().GetAwaiter().GetResult();
+                }
+                catch { }
+            }
         }
 
         private static void CheckVigemBusDriver()
