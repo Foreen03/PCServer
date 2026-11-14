@@ -334,7 +334,7 @@ namespace Backend
             {
                 var file = ImageFile.FromFile(filePath);
                 file.SetGPSCoords((float)lat, (float)lon);
-                file.Properties.Set(ExifTag.DateTimeOriginal, DateTime.UtcNow);
+                file.Properties.Set(ExifTag.DateTimeOriginal, DateTime.Now);
                 file.Save(filePath);
                 Console.WriteLine($"[EXIF] GPS written: ({lat:F6}, {lon:F6})");
             }
