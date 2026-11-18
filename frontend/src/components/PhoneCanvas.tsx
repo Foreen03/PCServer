@@ -21,6 +21,7 @@ import {
 import { PropertiesPanel } from "./PropertiesPanel"
 import { CanvasButton } from "./CanvasButton"
 import type { PhoneDevice } from "@/lib/devices"
+import { getUniqueCommand } from "@/lib/utils"
 
 // ─── Phone Canvas ───────────────────────────────────────────────────────────
 
@@ -171,18 +172,19 @@ export function PhoneCanvas({
 
   const handleAddComponent = useCallback(() => {
     const newId = `btn_${Date.now()}`;
+    const newCommand = getUniqueCommand("button", state.layout.components);
     const newComponent: GamepadComponent = {
       type: "button",
       id: newId,
       position: { x: 0.5, y: 0.5 },
       size: { width: 0.15, height: 0.15 },
       shape: "circle",
-      command: "new_command",
+      command: newCommand,
       content: { type: "text", text: "New" },
     };
     dispatch({ type: "ADD_COMPONENT", payload: newComponent });
     onSelect(newId);
-  }, [dispatch, onSelect]);
+  }, [dispatch, onSelect, state.layout.components]);
 
   const handleAddSystemComponent = useCallback((type: SystemComponentType) => {
     const newId = `${type}_${Date.now()}`;
@@ -211,17 +213,30 @@ export function PhoneCanvas({
 
   const handleDuplicateComponent = useCallback((comp: GamepadComponent) => {
     const newId = `btn_${Date.now()}`;
+    const newCommand = getUniqueCommand(`${comp.command}_copy`, state.layout.components);
     const newComponent: GamepadComponent = {
       ...comp,
       id: newId,
+      command: newCommand,
       position: {
         x: Math.min(comp.position.x + 0.05, 0.95),
         y: Math.min(comp.position.y + 0.05, 0.95),
       }
     };
     dispatch({ type: "ADD_COMPONENT", payload: newComponent });
+    if (state.controllerMapping?.buttonMap?.[comp.command]) {
+      dispatch({
+        type: "UPDATE_CONTROLLER_MAPPING",
+        payload: {
+          buttonMap: {
+            ...(state.controllerMapping.buttonMap || {}),
+            [newCommand]: state.controllerMapping.buttonMap[comp.command],
+          },
+        },
+      });
+    }
     onSelect(newId);
-  }, [dispatch, onSelect]);
+  }, [dispatch, onSelect, state.layout.components, state.controllerMapping]);
 
   const { safeArea } = state.layout
   const bgImg = state.theme.backgroundImage

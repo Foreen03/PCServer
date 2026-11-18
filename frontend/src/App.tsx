@@ -86,9 +86,65 @@ function editorReducer(
         },
       };
 
-    case "UPDATE_COMPONENT":
+    case "UPDATE_COMPONENT": {
+      const oldComp = state.layout.components.find((c) => c.id === action.payload.id);
+      const oldCommand = oldComp?.command;
+      const newCommand = action.payload.updates.command;
+
+      let updatedControllerMapping = state.controllerMapping;
+      let updatedConflicts = state.conflictsResolution;
+
+      if (oldCommand && newCommand && oldCommand !== newCommand) {
+        const isOldCommandUsedElsewhere = state.layout.components.some(
+          (c) => c.id !== action.payload.id && c.command === oldCommand
+        );
+
+        if (state.controllerMapping) {
+          const buttonMap = { ...(state.controllerMapping.buttonMap || {}) };
+          if (buttonMap[oldCommand] !== undefined) {
+            buttonMap[newCommand] = buttonMap[oldCommand];
+            if (!isOldCommandUsedElsewhere) {
+              delete buttonMap[oldCommand];
+            }
+          }
+
+          const axisMap = { ...(state.controllerMapping.axisMap || {}) };
+          if (axisMap[oldCommand] !== undefined) {
+            axisMap[newCommand] = axisMap[oldCommand];
+            if (!isOldCommandUsedElsewhere) {
+              delete axisMap[oldCommand];
+            }
+          }
+
+          const sensorMap = { ...(state.controllerMapping.sensorMap || {}) };
+          if (sensorMap[oldCommand] !== undefined) {
+            sensorMap[newCommand] = sensorMap[oldCommand];
+            if (!isOldCommandUsedElsewhere) {
+              delete sensorMap[oldCommand];
+            }
+          }
+
+          updatedControllerMapping = {
+            ...state.controllerMapping,
+            buttonMap,
+            axisMap,
+            sensorMap,
+          };
+        }
+
+        if (state.conflictsResolution) {
+          updatedConflicts = state.conflictsResolution.map((cr) => ({
+            ...cr,
+            commands: cr.commands.map((cmd) => (cmd === oldCommand ? newCommand : cmd)),
+            priority: cr.priority?.map((cmd) => (cmd === oldCommand ? newCommand : cmd)),
+          }));
+        }
+      }
+
       return {
         ...state,
+        controllerMapping: updatedControllerMapping,
+        conflictsResolution: updatedConflicts,
         layout: {
           ...state.layout,
           components: state.layout.components.map((c) =>
@@ -98,10 +154,28 @@ function editorReducer(
           ),
         },
       };
+    }
 
-    case "DELETE_COMPONENT":
+    case "DELETE_COMPONENT": {
+      const compToDelete = state.layout.components.find((c) => c.id === action.payload);
+      const command = compToDelete?.command;
+      const isCommandUsedElsewhere = state.layout.components.some(
+        (c) => c.id !== action.payload && c.command === command
+      );
+
+      let updatedControllerMapping = state.controllerMapping;
+      if (command && !isCommandUsedElsewhere && state.controllerMapping) {
+        const buttonMap = { ...(state.controllerMapping.buttonMap || {}) };
+        delete buttonMap[command];
+        updatedControllerMapping = {
+          ...state.controllerMapping,
+          buttonMap,
+        };
+      }
+
       return {
         ...state,
+        controllerMapping: updatedControllerMapping,
         layout: {
           ...state.layout,
           components: state.layout.components.filter(
@@ -109,6 +183,7 @@ function editorReducer(
           ),
         },
       };
+    }
 
     case "ADD_CONFLICT_RESOLUTION":
       return {

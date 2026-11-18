@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { cn, getUniqueCommand } from "@/lib/utils";
 import {
   DndContext,
   closestCenter,
@@ -336,18 +336,19 @@ export function PropertiesPanel({
 
   const handleAddComponent = useCallback(() => {
     const newId = `btn_${Date.now()}`;
+    const newCommand = getUniqueCommand("button", state.layout.components);
     const newComponent: GamepadComponent = {
       type: "button",
       id: newId,
       position: { x: 0.5, y: 0.5 },
       size: { width: 0.15, height: 0.15 },
       shape: "circle",
-      command: "new_command",
+      command: newCommand,
       content: { type: "text", text: "New" },
     };
     dispatch({ type: "ADD_COMPONENT", payload: newComponent });
     onSelect(newId);
-  }, [dispatch, onSelect]);
+  }, [dispatch, onSelect, state.layout.components]);
 
   const handleDeleteComponent = useCallback(
     (id: string) => {
@@ -931,39 +932,45 @@ export function PropertiesPanel({
                   <Label className="text-xs text-foreground font-medium">
                     Button Map
                   </Label>
-                  {state.layout.components.map((c) => (
-                    <FieldRow key={c.id} label={getComponentLabel(c)}>
-                      <Select
-                        value={
-                          state.controllerMapping?.buttonMap?.[c.command] ||
-                          "NONE"
-                        }
-                        onValueChange={(v) => {
-                          const newButtonMap = {
-                            ...(state.controllerMapping?.buttonMap || {}),
-                          };
-                          if (v === "NONE") {
-                            delete newButtonMap[c.command];
-                          } else {
-                            newButtonMap[c.command] = v;
-                          }
-                          handleMappingUpdate({ buttonMap: newButtonMap });
-                        }}
+                  {state.layout.components.map((c) => {
+                    const isShared = state.layout.components.filter((other) => other.command === c.command).length > 1;
+                    return (
+                      <FieldRow
+                        key={c.id}
+                        label={isShared ? `${getComponentLabel(c)} (${c.command})` : getComponentLabel(c)}
                       >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Not Mapped" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="NONE">Not Mapped</SelectItem>
-                          {XBOX_BUTTONS.map((btn) => (
-                            <SelectItem key={btn} value={btn}>
-                              {btn}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FieldRow>
-                  ))}
+                        <Select
+                          value={
+                            state.controllerMapping?.buttonMap?.[c.command] ||
+                            "NONE"
+                          }
+                          onValueChange={(v) => {
+                            const newButtonMap = {
+                              ...(state.controllerMapping?.buttonMap || {}),
+                            };
+                            if (v === "NONE") {
+                              delete newButtonMap[c.command];
+                            } else {
+                              newButtonMap[c.command] = v;
+                            }
+                            handleMappingUpdate({ buttonMap: newButtonMap });
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Not Mapped" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NONE">Not Mapped</SelectItem>
+                            {XBOX_BUTTONS.map((btn) => (
+                              <SelectItem key={btn} value={btn}>
+                                {btn}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FieldRow>
+                    );
+                  })}
 
                   <Separator className="my-1" />
                   <Label className="text-xs text-foreground font-medium">
@@ -1336,6 +1343,11 @@ export function PropertiesPanel({
                     className="h-8 text-xs font-mono"
                   />
                 </FieldRow>
+                {state.layout.components.some((c) => c.id !== selectedComponent.id && c.command === selectedComponent.command) && (
+                  <p className="text-[11px] text-amber-500">
+                    Warning: Command &quot;{selectedComponent.command}&quot; is shared with another button.
+                  </p>
+                )}
                 <FieldRow label="Shape">
                   <Select value={selectedComponent.shape}
                     onValueChange={(v) => dispatch({ type: "UPDATE_COMPONENT", payload: { id: selectedComponent.id, updates: { shape: v as "circle" | "rectangle" } } })}>
@@ -1493,6 +1505,11 @@ export function PropertiesPanel({
                         </SelectContent>
                       </Select>
                     </FieldRow>
+                    {state.layout.components.some((c) => c.id !== selectedComponent.id && c.command === selectedComponent.command) && (
+                      <p className="text-[11px] text-amber-500">
+                        Notice: Buttons sharing command &quot;{selectedComponent.command}&quot; will use this same mapping.
+                      </p>
+                    )}
                   </>
                 )}
 
