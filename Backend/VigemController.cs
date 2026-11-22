@@ -140,6 +140,7 @@ namespace Backend
         public void Activate(string controllerMappingJson)
         {
             Log("Vigem Controller Activated");
+            smoothedAxisValues.Clear();
             LoadControllerMapping(controllerMappingJson);
             try
             {
@@ -161,8 +162,15 @@ namespace Backend
         public void Deactivate()
         {
             Log("--- Vigem Controller Deactivated ---");
+            smoothedAxisValues.Clear();
             if (controller != null)
             {
+                try
+                {
+                    controller.ResetReport();
+                    controller.SubmitReport();
+                }
+                catch { }
                 controller.Disconnect();
                 Log("ViGEm controller disconnected.");
             }
@@ -185,7 +193,6 @@ namespace Backend
                     {
                         try
                         {
-                            controller.ResetReport();
                             ProcessButtons(p, controllerMapping.Mapping, controller);
                             ProcessAxes(p, controllerMapping.Mapping, controller);
 
@@ -414,36 +421,55 @@ namespace Backend
 
         private void ProcessButtons(Packet p, MappingConfig mapping, IXbox360Controller controller)
         {
-            if (mapping.ButtonMap == null || !p.payload.ContainsKey("buttons")) return;
+            if (mapping.ButtonMap == null) return;
 
-            var buttons = JObject.FromObject(p.payload["buttons"]).ToObject<Dictionary<string, bool>>();
-            if (buttons == null) return;
-
-            foreach (var buttonEntry in buttons)
+            Dictionary<string, bool>? buttons = null;
+            if (p.payload != null && p.payload.TryGetValue("buttons", out var buttonsObj) && buttonsObj != null)
             {
-                if (mapping.ButtonMap.TryGetValue(buttonEntry.Key, out var targetButtonStr))
+                if (buttonsObj is JObject jObj)
                 {
-                    if (targetButtonStr == null) continue;
-
-                    switch (targetButtonStr.ToLower())
+                    buttons = jObj.ToObject<Dictionary<string, bool>>();
+                }
+                else if (buttonsObj is Dictionary<string, bool> dict)
+                {
+                    buttons = dict;
+                }
+                else
+                {
+                    try
                     {
-                        case "a": controller.SetButtonState(Xbox360Button.A, buttonEntry.Value); break;
-                        case "b": controller.SetButtonState(Xbox360Button.B, buttonEntry.Value); break;
-                        case "x": controller.SetButtonState(Xbox360Button.X, buttonEntry.Value); break;
-                        case "y": controller.SetButtonState(Xbox360Button.Y, buttonEntry.Value); break;
-                        case "leftshoulder": controller.SetButtonState(Xbox360Button.LeftShoulder, buttonEntry.Value); break;
-                        case "rightshoulder": controller.SetButtonState(Xbox360Button.RightShoulder, buttonEntry.Value); break;
-                        case "leftthumb": controller.SetButtonState(Xbox360Button.LeftThumb, buttonEntry.Value); break;
-                        case "rightthumb": controller.SetButtonState(Xbox360Button.RightThumb, buttonEntry.Value); break;
-                        case "start": controller.SetButtonState(Xbox360Button.Start, buttonEntry.Value); break;
-                        case "back": controller.SetButtonState(Xbox360Button.Back, buttonEntry.Value); break;
-                        case "up": controller.SetButtonState(Xbox360Button.Up, buttonEntry.Value); break;
-                        case "down": controller.SetButtonState(Xbox360Button.Down, buttonEntry.Value); break;
-                        case "left": controller.SetButtonState(Xbox360Button.Left, buttonEntry.Value); break;
-                        case "right": controller.SetButtonState(Xbox360Button.Right, buttonEntry.Value); break;
-                        case "lefttrigger": controller.LeftTrigger = buttonEntry.Value ? (byte)255 : (byte)0; break;
-                        case "righttrigger": controller.RightTrigger = buttonEntry.Value ? (byte)255 : (byte)0; break;
+                        buttons = JObject.FromObject(buttonsObj).ToObject<Dictionary<string, bool>>();
                     }
+                    catch { }
+                }
+            }
+
+            foreach (var buttonEntry in mapping.ButtonMap)
+            {
+                string mobileKey = buttonEntry.Key;
+                string targetButtonStr = buttonEntry.Value;
+                if (string.IsNullOrEmpty(targetButtonStr)) continue;
+
+                bool isPressed = buttons != null && buttons.TryGetValue(mobileKey, out var pressed) && pressed;
+
+                switch (targetButtonStr.ToLower())
+                {
+                    case "a": controller.SetButtonState(Xbox360Button.A, isPressed); break;
+                    case "b": controller.SetButtonState(Xbox360Button.B, isPressed); break;
+                    case "x": controller.SetButtonState(Xbox360Button.X, isPressed); break;
+                    case "y": controller.SetButtonState(Xbox360Button.Y, isPressed); break;
+                    case "leftshoulder": controller.SetButtonState(Xbox360Button.LeftShoulder, isPressed); break;
+                    case "rightshoulder": controller.SetButtonState(Xbox360Button.RightShoulder, isPressed); break;
+                    case "leftthumb": controller.SetButtonState(Xbox360Button.LeftThumb, isPressed); break;
+                    case "rightthumb": controller.SetButtonState(Xbox360Button.RightThumb, isPressed); break;
+                    case "start": controller.SetButtonState(Xbox360Button.Start, isPressed); break;
+                    case "back": controller.SetButtonState(Xbox360Button.Back, isPressed); break;
+                    case "up": controller.SetButtonState(Xbox360Button.Up, isPressed); break;
+                    case "down": controller.SetButtonState(Xbox360Button.Down, isPressed); break;
+                    case "left": controller.SetButtonState(Xbox360Button.Left, isPressed); break;
+                    case "right": controller.SetButtonState(Xbox360Button.Right, isPressed); break;
+                    case "lefttrigger": controller.LeftTrigger = isPressed ? (byte)255 : (byte)0; break;
+                    case "righttrigger": controller.RightTrigger = isPressed ? (byte)255 : (byte)0; break;
                 }
             }
         }
@@ -457,10 +483,19 @@ namespace Backend
                 var axisConfig = axisEntry.Value;
                 if (axisConfig.Mode == "tilt")
                 {
-                    if (!p.payload.TryGetValue("x", out var rawX) ||
+                    if (p.payload == null ||
+                        !p.payload.TryGetValue("x", out var rawX) ||
                         !p.payload.TryGetValue("y", out var rawY) ||
                         !p.payload.TryGetValue("z", out var rawZ))
                     {
+                        // Maintain last smoothed value across packets that don't carry fresh sensor data
+                        // (e.g. button-only packets, dropped/fragmented packets), preventing ResetReport()
+                        // from resetting LeftStickX to 0.
+                        if (smoothedAxisValues.TryGetValue(axisEntry.Key, out var lastValue))
+                        {
+                            short cachedVal = (short)(lastValue * 32767.0f);
+                            SetControllerValue(controller, axisConfig.Target, cachedVal);
+                        }
                         continue;
                     }
 
@@ -469,7 +504,15 @@ namespace Backend
                     float az = Convert.ToSingle(rawZ);
 
                     float magnitude = MathF.Sqrt(ax * ax + ay * ay + az * az);
-                    if (magnitude < 0.0001f) continue;
+                    if (magnitude < 0.0001f)
+                    {
+                        if (smoothedAxisValues.TryGetValue(axisEntry.Key, out var lastValue))
+                        {
+                            short cachedVal = (short)(lastValue * 32767.0f);
+                            SetControllerValue(controller, axisConfig.Target, cachedVal);
+                        }
+                        continue;
+                    }
 
                     float rawSteering = 0f;
                     string steerSource = axisConfig.Source ?? "x";
@@ -500,6 +543,11 @@ namespace Backend
                     }
                     targetSteering = Math.Clamp(targetSteering / maxTilt, -1f, 1f);
 
+                    if (axisConfig.Invert)
+                    {
+                        targetSteering = -targetSteering;
+                    }
+
                     if (!smoothedAxisValues.ContainsKey(axisEntry.Key))
                     {
                         smoothedAxisValues[axisEntry.Key] = 0f;
@@ -507,13 +555,7 @@ namespace Backend
 
                     smoothedAxisValues[axisEntry.Key] = Lerp(smoothedAxisValues[axisEntry.Key], targetSteering, (float)axisConfig.Smoothing);
 
-                    if (axisConfig.Invert)
-                    {
-                        smoothedAxisValues[axisEntry.Key] *= -1;
-                    }
-
                     float steering = smoothedAxisValues[axisEntry.Key];
-
 
                     short axisValue = (short)(smoothedAxisValues[axisEntry.Key] * 32767.0f);
                     SetControllerValue(controller, axisConfig.Target, axisValue);
@@ -521,7 +563,7 @@ namespace Backend
                 else
                 {
                     // Original logic for non-tilt axes
-                    if (axisConfig.Source != null && p.payload.TryGetValue(axisConfig.Source, out var rawValue))
+                    if (axisConfig.Source != null && p.payload != null && p.payload.TryGetValue(axisConfig.Source, out var rawValue))
                     {
                         var value = Convert.ToDouble(rawValue);
 
